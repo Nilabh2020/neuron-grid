@@ -13,9 +13,9 @@
   - **backend**: Node.js API layer.
 
 ## Phase 1 MVP Progress
-- [ ] Node Discovery Protocol (FastAPI registration)
-- [ ] Cluster Registration Logic
-- [ ] Heartbeat System
+- [x] Node Discovery Protocol (FastAPI registration)
+- [x] Cluster Registration Logic
+- [x] Heartbeat System
 
 ## Tech Stack
 - Python (FastAPI, WebSockets)
