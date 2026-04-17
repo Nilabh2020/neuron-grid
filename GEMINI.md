@@ -12,10 +12,10 @@
   - **frontend**: Next.js, Tailwind, shadcn/ui.
   - **backend**: Node.js API layer.
 
-## Phase 1 MVP Progress
-- [x] Node Discovery Protocol (FastAPI registration)
-- [x] Cluster Registration Logic
-- [x] Heartbeat System
+## Phase 2 MVP Progress
+- [x] Model Manager Service (HuggingFace integration)
+- [ ] Remote Inference System (llama.cpp)
+- [ ] OpenAI Compatible API
 
 ## Tech Stack
 - Python (FastAPI, WebSockets)

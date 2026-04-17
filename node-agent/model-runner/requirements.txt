@@ -1,0 +1,8 @@
+llama-cpp-python
+fastapi
+uvicorn
+pydantic
+requests
+tqdm
+python-dotenv
+aiofiles

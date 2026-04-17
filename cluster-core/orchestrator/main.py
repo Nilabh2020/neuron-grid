@@ -55,14 +55,59 @@ async def receive_heartbeat(heartbeat: Heartbeat):
 async def list_nodes():
     current_time = time.time()
     active_nodes = []
-    
     for node_id, data in nodes.items():
-        # Mark as offline if no heartbeat for 30 seconds
         if current_time - data.get("last_seen", 0) > 30:
             data["status"] = "offline"
         active_nodes.append(data)
-        
     return active_nodes
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: List[dict]
+    stream: bool = False
+    max_tokens: Optional[int] = 512
+    temperature: Optional[float] = 0.7
+
+@app.post("/v1/chat/completions")
+async def chat_completions(req: ChatCompletionRequest):
+    """OpenAI-compatible API routing."""
+    # Find an online node (Simple round-robin or first-available for MVP)
+    active_node = None
+    current_time = time.time()
+    
+    for node_id, data in nodes.items():
+        if current_time - data.get("last_seen", 0) < 30 and data.get("status") == "online":
+            active_node = data
+            break
+            
+    if not active_node:
+        raise HTTPException(status_code=503, detail="No active nodes available in cluster")
+
+    # Route request to node-agent (model-runner)
+    # Note: In production, the node IP would be used. Assuming agent on same machine for now.
+    node_url = f"http://localhost:8003/completions" # Default port for runner
+    
+    try:
+        # Pass the model name and messages to the runner
+        runner_req = {
+            "model_name": req.model,
+            "messages": req.messages,
+            "stream": req.stream,
+            "max_tokens": req.max_tokens,
+            "temperature": req.temperature
+        }
+        
+        if req.stream:
+            # Proxy streaming response
+            response = requests.post(node_url, json=runner_req, stream=True)
+            return StreamingResponse(response.iter_lines(), media_type="text/event-stream")
+        else:
+            response = requests.post(node_url, json=runner_req)
+            return response.json()
+            
+    except Exception as e:
+        logger.error(f"Routing error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
