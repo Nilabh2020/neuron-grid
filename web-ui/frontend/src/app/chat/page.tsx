@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Send, User, Bot, Sparkles, Activity, Network } from 'lucide-react';
 
@@ -8,8 +8,24 @@ export default function ChatPlayground() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState('llama-3-8b.gguf');
+  const [model, setModel] = useState('');
+  const [localModels, setLocalModels] = useState<any[]>([]);
   const [telemetry, setTelemetry] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get('http://localhost:3001/api/local-models');
+        setLocalModels(res.data);
+        if (res.data.length > 0) {
+          setModel(res.data[0].filename);
+        }
+      } catch (err) {
+        console.error("Failed to fetch models for chat", err);
+      }
+    };
+    fetchModels();
+  }, []);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -60,8 +76,10 @@ export default function ChatPlayground() {
             onChange={(e) => setModel(e.target.value)}
             className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:border-white transition-colors cursor-pointer"
           >
-            <option value="llama-3-8b.gguf">Llama 3 8B (GGUF)</option>
-            <option value="mistral-7b.gguf">Mistral 7B (GGUF)</option>
+            {localModels.length === 0 && <option value="">No local models found</option>}
+            {localModels.map((m, i) => (
+              <option key={i} value={m.filename}>{m.name} ({m.quant})</option>
+            ))}
           </select>
         </div>
       </header>

@@ -86,6 +86,20 @@ export default function ModelsPage() {
 
   const [downloads, setDownloads] = useState<{[key: string]: any}>({});
 
+  // Poll active downloads
+  useEffect(() => {
+    const pollDownloads = async () => {
+      try {
+        const res = await axios.get('http://localhost:3001/api/models/downloads');
+        setDownloads(res.data);
+      } catch (err) {
+        console.error("Error polling downloads", err);
+      }
+    };
+    const interval = setInterval(pollDownloads, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Fetch Files for Selected Model
   useEffect(() => {
     const fetchFiles = async () => {
@@ -106,36 +120,19 @@ export default function ModelsPage() {
     fetchFiles();
   }, [selectedModel]);
 
-  const handleDownload = (file: any) => {
-    if (downloads[file.filename]) return; // Already downloading
+  const handleDownload = async (file: any) => {
+    if (downloads[file.filename] && downloads[file.filename].status === 'downloading') return;
 
-    setDownloads(prev => ({
-      ...prev,
-      [file.filename]: { progress: 0, speed: 'Initializing...', eta: 'Calculating...', status: 'downloading' }
-    }));
-
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += Math.random() * 5; // Mock speed
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        clearInterval(interval);
-        setDownloads(prev => ({
-          ...prev,
-          [file.filename]: { ...prev[file.filename], progress: 100, status: 'completed' }
-        }));
-      } else {
-        const speed = (30 + Math.random() * 20).toFixed(1) + ' MB/s';
-        const remainingTicks = (100 - currentProgress) / 2.5;
-        const etaSeconds = Math.ceil(remainingTicks);
-        const eta = etaSeconds > 60 ? `${Math.floor(etaSeconds / 60)}m ${etaSeconds % 60}s` : `${etaSeconds}s`;
-        
-        setDownloads(prev => ({
-          ...prev,
-          [file.filename]: { progress: currentProgress, speed, eta, status: 'downloading' }
-        }));
-      }
-    }, 1000);
+    try {
+      await axios.post('http://localhost:3001/api/models/download', {
+        filename: file.filename,
+        download_url: file.download_url
+      });
+      // The polling loop will pick up the progress in the next tick
+    } catch (err) {
+      console.error("Failed to start download:", err);
+      alert("Failed to start download. Check console for details.");
+    }
   };
 
   return (

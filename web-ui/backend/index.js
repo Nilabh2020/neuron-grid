@@ -103,7 +103,102 @@ app.get('/api/models/files', async (req, res) => {
     }
 });
 
-// Proxy Chat Completions (Direct to Orchestrator)
+const activeDownloads = {};
+
+// Start Model Download
+app.post('/api/models/download', async (req, res) => {
+    const { filename, download_url } = req.body;
+    
+    if (!filename || !download_url) {
+        return res.status(400).json({ error: 'filename and download_url are required' });
+    }
+
+    if (activeDownloads[filename]) {
+        return res.json({ status: 'already_downloading' });
+    }
+
+    const filePath = path.join(MODELS_DIR, filename);
+    const tempPath = filePath + '.download';
+
+    activeDownloads[filename] = {
+        progress: 0,
+        speed: '0 MB/s',
+        eta: 'Calculating...',
+        status: 'downloading',
+        totalBytes: 0,
+        downloadedBytes: 0
+    };
+
+    res.json({ status: 'started', filename });
+
+    try {
+        const response = await axios({
+            method: 'GET',
+            url: download_url,
+            responseType: 'stream'
+        });
+
+        const totalLength = response.headers['content-length'];
+        activeDownloads[filename].totalBytes = parseInt(totalLength, 10);
+
+        const writer = fs.createWriteStream(tempPath);
+        
+        let downloadedBytes = 0;
+        let lastTime = Date.now();
+        let lastBytes = 0;
+
+        response.data.on('data', (chunk) => {
+            downloadedBytes += chunk.length;
+            activeDownloads[filename].downloadedBytes = downloadedBytes;
+            
+            const currentTime = Date.now();
+            const timeDiff = (currentTime - lastTime) / 1000; // in seconds
+
+            if (timeDiff >= 1) { // Update speed every second
+                const bytesDiff = downloadedBytes - lastBytes;
+                const speedMBps = bytesDiff / (1024 * 1024) / timeDiff;
+                const remainingBytes = activeDownloads[filename].totalBytes - downloadedBytes;
+                const etaSeconds = remainingBytes / bytesDiff * timeDiff;
+                
+                activeDownloads[filename].progress = (downloadedBytes / activeDownloads[filename].totalBytes) * 100;
+                activeDownloads[filename].speed = speedMBps.toFixed(1) + ' MB/s';
+                
+                if (etaSeconds > 0 && isFinite(etaSeconds)) {
+                    const m = Math.floor(etaSeconds / 60);
+                    const s = Math.floor(etaSeconds % 60);
+                    activeDownloads[filename].eta = m > 0 ? `${m}m ${s}s` : `${s}s`;
+                }
+                
+                lastTime = currentTime;
+                lastBytes = downloadedBytes;
+            }
+        });
+
+        response.data.pipe(writer);
+
+        writer.on('finish', () => {
+            fs.renameSync(tempPath, filePath);
+            activeDownloads[filename].progress = 100;
+            activeDownloads[filename].status = 'completed';
+        });
+
+        writer.on('error', (err) => {
+            console.error('Download error:', err);
+            fs.unlinkSync(tempPath);
+            activeDownloads[filename].status = 'error';
+        });
+
+    } catch (error) {
+        console.error('Download request failed:', error);
+        activeDownloads[filename].status = 'error';
+    }
+});
+
+// Check Download Status
+app.get('/api/models/downloads', (req, res) => {
+    res.json(activeDownloads);
+});
+
 app.post('/api/chat', async (req, res) => {
     try {
         const response = await axios.post(`${ORCHESTRATOR_URL}/v1/chat/completions`, req.body);
