@@ -1,0 +1,9 @@
+{
+    "version": "1.0.0",
+    "description": "NeuronGrid: Private Local AI Cloud for the Modern Enterprise",
+    "homepage": "https://github.com/Nilabh/neuron-grid",
+    "url": "https://github.com/Nilabh/neuron-grid/releases/download/v1.0.0/NeuronGrid-win.zip",
+    "hash": "REPLACE_WITH_SHA256",
+    "bin": "NeuronGrid.exe",
+    "checkver": "github"
+}

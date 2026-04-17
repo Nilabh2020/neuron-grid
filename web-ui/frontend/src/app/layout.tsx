@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { LayoutDashboard, Cpu, MessageSquare, Settings, Database } from "lucide-react";
+import { LayoutDashboard, HardDrive, MessageSquare, Settings, Database } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,9 +31,9 @@ export default function RootLayout({
               <LayoutDashboard size={20} />
               <span>Cluster Overview</span>
             </Link>
-            <Link href="/nodes" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-zinc-800/50 transition-all text-zinc-400 hover:text-white">
-              <Cpu size={20} />
-              <span>Nodes</span>
+            <Link href="/local-models" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-zinc-800/50 transition-all text-zinc-400 hover:text-white">
+              <HardDrive size={20} />
+              <span>Local Models</span>
             </Link>
             <Link href="/models" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl hover:bg-zinc-800/50 transition-all text-zinc-400 hover:text-white">
               <Database size={20} />
@@ -54,7 +54,7 @@ export default function RootLayout({
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 p-8 overflow-y-auto">
+        <main className="flex-1 p-0 overflow-y-auto">
           {children}
         </main>
       </body>

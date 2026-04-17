@@ -3,11 +3,25 @@
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 
 const command = process.argv[2];
-const rootDir = __dirname;
+
+// Detect if running inside a PKG bundle
+const isBundled = process.pkg ? true : false;
+const exeDir = isBundled ? path.dirname(process.execPath) : __dirname;
+
+// Smart path: look for the folders in exeDir OR parent of exeDir
+let rootDir = exeDir;
+if (isBundled && !fs.existsSync(path.join(exeDir, 'cluster-core'))) {
+    rootDir = path.dirname(exeDir); // Try parent if in dist/
+}
 
 function runCmd(name, cmd, cwd) {
+    if (!fs.existsSync(cwd)) {
+        console.error(`[${name}] ERROR: Directory not found: ${cwd}`);
+        return null;
+    }
     console.log(`[${name}] Starting in ${cwd}...`);
     const p = spawn(cmd, { shell: true, cwd });
     
@@ -19,6 +33,7 @@ function runCmd(name, cmd, cwd) {
 }
 
 function installPythonDeps(name, dir) {
+    if (isBundled) return; // Skip in production build
     const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
     console.log(`[${name}] Installing Python requirements...`);
     try {
@@ -29,6 +44,7 @@ function installPythonDeps(name, dir) {
 }
 
 function installNodeDeps(name, dir) {
+    if (isBundled) return; // Skip in production build
     console.log(`[${name}] Installing Node.js dependencies...`);
     try {
         execSync(`npm install`, { stdio: 'inherit', cwd: dir });

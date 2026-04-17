@@ -22,9 +22,8 @@ function createWindow() {
 
   win.loadURL(startUrl);
   
-  if (isDev) {
-    win.webContents.openDevTools({ mode: 'detach' });
-  }
+  // Always start with DevTools closed for the Enterprise experience
+  // win.webContents.openDevTools({ mode: 'detach' });
 }
 
 app.whenReady().then(() => {
