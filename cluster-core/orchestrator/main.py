@@ -113,9 +113,9 @@ async def chat_completions(req: ChatCompletionRequest):
     if not active_node:
         raise HTTPException(status_code=503, detail="No active nodes available in cluster")
 
-    # Route request to node-agent (model-runner)
-    # Note: In production, the node IP would be used. Assuming agent on same machine for now.
-    node_url = f"http://localhost:8003/completions" # Default port for runner
+    # Route request to the selected node-agent (model-runner)
+    node_ip = active_node.get("ip_address", "localhost")
+    node_url = f"http://{node_ip}:8003/completions" # Default port for runner
     
     try:
         # Pass the model name and messages to the runner
