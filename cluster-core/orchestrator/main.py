@@ -111,11 +111,35 @@ async def chat_completions(req: ChatCompletionRequest):
     if not active_nodes:
         raise HTTPException(status_code=503, detail="No active nodes available in cluster")
 
-    # Sort nodes by RAM to pick the beefiest one as the Master Node
-    active_nodes.sort(key=lambda x: x.get("ram_gb", 0), reverse=True)
+    # --- Heterogeneous Compute Profiling ---
+    for node in active_nodes:
+        # Calculate a compute score based on GPU VRAM, falling back to RAM
+        score = 0
+        gpus = node.get("gpu_info", [])
+        if gpus:
+            for gpu in gpus:
+                score += gpu.get("vram_mb", 0) * gpu.get("compute_score", 1)
+        else:
+            score += node.get("ram_gb", 0) * 10 # CPU/RAM is heavily penalized
+        
+        node["_compute_score"] = score
+
+    # Sort nodes by the new compute score (best hardware first)
+    active_nodes.sort(key=lambda x: x.get("_compute_score", 0), reverse=True)
+    
+    total_score = sum(n.get("_compute_score", 1) for n in active_nodes)
     
     master_node = active_nodes[0]
     worker_nodes = active_nodes[1:]
+    
+    # Calculate Asymmetric Sharding Profile
+    sharding_profile = {}
+    for n in active_nodes:
+        percentage = round((n.get("_compute_score", 1) / total_score) * 100, 1)
+        sharding_profile[n.get("hostname")] = f"{percentage}%"
+        
+    logger.info(f"--- Asymmetric Load Balancing Profile ---")
+    logger.info(f"{sharding_profile}")
     
     # 1. Tell all worker nodes to start their RPC servers
     worker_ips = []
