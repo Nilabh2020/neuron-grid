@@ -7,6 +7,8 @@ import aiofiles
 import subprocess
 import zipfile
 import threading
+import platform
+import stat
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -33,26 +35,53 @@ os.makedirs(BIN_DIR, exist_ok=True)
 rpc_process = None
 master_process = None
 
-# Binary Downloader (MVP: Windows CPU/AVX2)
-LLAMA_CPP_RELEASE_URL = "https://github.com/ggerganov/llama.cpp/releases/download/b2640/llama-b2640-bin-win-avx2-x64.zip"
+def get_binary_info():
+    """Detects the current OS and CPU architecture to fetch the correct llama.cpp binary."""
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    base_url = "https://github.com/ggerganov/llama.cpp/releases/download/b2640/"
+    
+    if system == "windows":
+        return base_url + "llama-b2640-bin-win-avx2-x64.zip", ".exe"
+    elif system == "darwin": # macOS and iOS devices running desktop binaries
+        if "arm" in machine or "aarch64" in machine:
+            return base_url + "llama-b2640-bin-macos-arm64.zip", ""
+        else:
+            return base_url + "llama-b2640-bin-macos-x64.zip", ""
+    else: # Linux and others
+        return base_url + "llama-b2640-bin-ubuntu-x64.zip", ""
 
 def ensure_binaries():
-    """Downloads llama.cpp binaries if they don't exist."""
-    llama_server = os.path.join(BIN_DIR, "llama-server.exe")
-    llama_rpc = os.path.join(BIN_DIR, "llama-rpc-server.exe")
+    """Downloads llama.cpp binaries if they don't exist based on OS."""
+    url, ext = get_binary_info()
+    llama_server = os.path.join(BIN_DIR, f"llama-server{ext}")
+    llama_rpc = os.path.join(BIN_DIR, f"llama-rpc-server{ext}")
     
     if os.path.exists(llama_server) and os.path.exists(llama_rpc):
         return
         
-    logger.info("Downloading llama.cpp binaries for distributed inference...")
+    logger.info(f"Downloading llama.cpp binaries for {platform.system()} ({platform.machine()})...")
     zip_path = os.path.join(BIN_DIR, "llama.zip")
     
-    urllib.request.urlretrieve(LLAMA_CPP_RELEASE_URL, zip_path)
-    
+    try:
+        urllib.request.urlretrieve(url, zip_path)
+    except Exception as e:
+        logger.error(f"Failed to download binaries: {e}")
+        return
+        
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(BIN_DIR)
         
     os.remove(zip_path)
+    
+    # Make binaries executable on Unix/Linux/macOS systems
+    if ext == "":
+        try:
+            os.chmod(llama_server, os.stat(llama_server).st_mode | stat.S_IEXEC)
+            os.chmod(llama_rpc, os.stat(llama_rpc).st_mode | stat.S_IEXEC)
+        except Exception as e:
+            logger.warning(f"Could not automatically set executable permissions: {e}")
+            
     logger.info("Binaries ready.")
 
 class ChatCompletionRequest(BaseModel):
@@ -105,17 +134,17 @@ async def start_rpc_server():
     """Start the llama-rpc-server to act as a worker node."""
     global rpc_process
     
-    # If already running, just return
     if rpc_process and rpc_process.poll() is None:
         return {"status": "RPC server already running on port 50052"}
         
-    rpc_exe = os.path.join(BIN_DIR, "llama-rpc-server.exe")
+    _, ext = get_binary_info()
+    rpc_exe = os.path.join(BIN_DIR, f"llama-rpc-server{ext}")
+    
     if not os.path.exists(rpc_exe):
         raise HTTPException(status_code=503, detail="Binaries not ready yet. Please wait.")
         
     logger.info("Starting llama.cpp RPC Worker Server...")
     
-    # Start RPC server allowing all LAN IPs to connect
     cmd = [rpc_exe, "-H", "0.0.0.0", "-p", "50052"]
     rpc_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
@@ -134,10 +163,9 @@ async def create_completion(req: Request):
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail=f"Model {filename} not found.")
         
-    server_exe = os.path.join(BIN_DIR, "llama-server.exe")
+    _, ext = get_binary_info()
+    server_exe = os.path.join(BIN_DIR, f"llama-server{ext}")
     
-    # Start or Restart the Master Inference Server if RPC cluster changed
-    # In a real app, we'd track the current running model/rpc to avoid restarting
     if master_process:
         master_process.terminate()
         master_process.wait()
@@ -156,15 +184,11 @@ async def create_completion(req: Request):
     else:
         logger.info("Master Node: Running locally (No RPC workers provided)")
         
-    # Start the server
     master_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
-    # Wait for the HTTP server to boot
     time.sleep(3) 
     
-    # Proxy the OpenAI request to the local llama-server
     try:
-        # Format for OpenAI
         openai_req = {
             "messages": body.get("messages"),
             "max_tokens": body.get("max_tokens", 512),
