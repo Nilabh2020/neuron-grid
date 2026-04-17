@@ -100,39 +100,57 @@ class ChatCompletionRequest(BaseModel):
 
 @app.post("/v1/chat/completions")
 async def chat_completions(req: ChatCompletionRequest):
-    """OpenAI-compatible API routing."""
-    # Find an online node (Simple round-robin or first-available for MVP)
-    active_node = None
+    """OpenAI-compatible API routing with Distributed LAN Offloading."""
     current_time = time.time()
+    active_nodes = []
     
     for node_id, data in nodes.items():
         if current_time - data.get("last_seen", 0) < 30 and data.get("status") == "online":
-            active_node = data
-            break
+            active_nodes.append(data)
             
-    if not active_node:
+    if not active_nodes:
         raise HTTPException(status_code=503, detail="No active nodes available in cluster")
 
-    # Route request to the selected node-agent (model-runner)
-    node_ip = active_node.get("ip_address", "localhost")
-    node_url = f"http://{node_ip}:8003/completions" # Default port for runner
+    # Sort nodes by RAM to pick the beefiest one as the Master Node
+    active_nodes.sort(key=lambda x: x.get("ram_gb", 0), reverse=True)
+    
+    master_node = active_nodes[0]
+    worker_nodes = active_nodes[1:]
+    
+    # 1. Tell all worker nodes to start their RPC servers
+    worker_ips = []
+    for worker in worker_nodes:
+        worker_ip = worker.get("ip_address", "localhost")
+        try:
+            # Tell the worker to prepare for distributed inference
+            requests.post(f"http://{worker_ip}:8003/rpc/start", timeout=3)
+            worker_ips.append(f"{worker_ip}:50052")
+            logger.info(f"Started RPC on worker {worker_ip}")
+        except Exception as e:
+            logger.warning(f"Failed to start RPC on {worker_ip}: {e}")
+
+    # 2. Route the main request to the Master Node, passing the RPC cluster info
+    master_ip = master_node.get("ip_address", "localhost")
+    master_url = f"http://{master_ip}:8003/completions"
+    rpc_servers = ",".join(worker_ips)
     
     try:
-        # Pass the model name and messages to the runner
         runner_req = {
             "model_name": req.model,
             "messages": req.messages,
             "stream": req.stream,
             "max_tokens": req.max_tokens,
-            "temperature": req.temperature
+            "temperature": req.temperature,
+            "rpc_servers": rpc_servers # Pass the cluster pool to the master!
         }
         
+        logger.info(f"Routing job to Master ({master_ip}) with Workers ({rpc_servers})")
+        
         if req.stream:
-            # Proxy streaming response
-            response = requests.post(node_url, json=runner_req, stream=True)
+            response = requests.post(master_url, json=runner_req, stream=True)
             return StreamingResponse(response.iter_lines(), media_type="text/event-stream")
         else:
-            response = requests.post(node_url, json=runner_req)
+            response = requests.post(master_url, json=runner_req)
             return response.json()
             
     except Exception as e:
