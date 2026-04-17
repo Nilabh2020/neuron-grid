@@ -26,6 +26,48 @@ HEARTBEAT_INTERVAL = 10 # seconds
 app = FastAPI(title=f"NeuronGrid Node Agent ({NODE_ID})")
 
 import subprocess
+import re
+
+def estimate_compute_score(gpu_name: str) -> int:
+    """
+    Dynamically estimates a compute multiplier based on NVIDIA GPU naming conventions.
+    This allows universal support for any GPU (e.g., 2x5090, 1080 Ti, A100).
+    """
+    name = gpu_name.upper()
+    score = 10  # Base baseline
+    
+    # Match standard consumer RTX/GTX patterns (e.g., "4090", "1080", "3050")
+    match = re.search(r'([1-9][0-9])([5-9]0)', name)
+    if match:
+        gen = int(match.group(1)) # Generation (e.g., 10, 20, 30, 40, 50)
+        tier = int(match.group(2)) # Tier (e.g., 50, 60, 70, 80, 90)
+        
+        # Newer generation = exponentially faster
+        gen_mult = max(1.0, (gen / 10.0))
+        # Higher tier = exponentially faster
+        tier_mult = max(1.0, (tier - 40) / 10.0)
+        
+        score = int(gen_mult * tier_mult * 10)
+        
+        # Bonus for Ti / SUPER variants
+        if "TI" in name or "SUPER" in name:
+            score = int(score * 1.2)
+            
+    # Datacenter / Enterprise GPU Heuristics
+    elif "H100" in name: score = 400
+    elif "H200" in name: score = 500
+    elif "A100" in name: score = 200
+    elif "V100" in name: score = 100
+    elif "A40" in name: score = 80
+    elif "T4" in name: score = 30
+    elif "P40" in name: score = 20
+    elif "QUADRO" in name: score = 15
+    
+    # Penalty for mobile/laptop chips
+    if " M" in name or "-M" in name:
+        score = int(score * 0.7)
+        
+    return max(1, score)
 
 class HardwareStats:
     @staticmethod
@@ -39,16 +81,22 @@ class HardwareStats:
             for line in output.strip().split('\n'):
                 if line:
                     name, vram = line.split(',')
-                    gpus.append({"name": name.strip(), "vram_mb": int(vram.strip().split()[0])})
+                    clean_name = name.strip()
+                    gpus.append({
+                        "name": clean_name, 
+                        "vram_mb": int(vram.strip().split()[0]),
+                        "compute_score": estimate_compute_score(clean_name)
+                    })
             return gpus
         except Exception:
-            # For testing/demo on non-NVIDIA machines, return a simulated GPU based on port
-            # so we can show heterogeneous compute in the cluster
+            # Simulated fallback for testing on non-NVIDIA machines
+            # Still routes through our new dynamic universal scorer!
             port = int(os.getenv("NODE_AGENT_PORT", 8001))
             if port == 8001:
-                return [{"name": "NVIDIA RTX 5060 Ti", "vram_mb": 16384, "compute_score": 100}]
+                return [{"name": "NVIDIA RTX 5090", "vram_mb": 32768, "compute_score": estimate_compute_score("RTX 5090")},
+                        {"name": "NVIDIA RTX 5090", "vram_mb": 32768, "compute_score": estimate_compute_score("RTX 5090")}]
             else:
-                return [{"name": "NVIDIA RTX 3050 Ti", "vram_mb": 4096, "compute_score": 30}]
+                return [{"name": "NVIDIA GTX 1080 Ti", "vram_mb": 11264, "compute_score": estimate_compute_score("GTX 1080 Ti")}]
 
     @staticmethod
     def get_stats():

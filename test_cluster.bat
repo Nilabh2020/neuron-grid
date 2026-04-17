@@ -9,11 +9,11 @@ timeout /t 2 >nul
 
 start "Model Manager" cmd /c "cd cluster-core\model-manager && python main.py"
 
-echo Starting Simulated Node 1 (RTX 5060 Ti)...
+echo Starting Simulated Node 1 (2x NVIDIA RTX 5090)...
 start "Node 1 Agent" cmd /c "set NODE_AGENT_PORT=8001 && cd node-agent\device-service && python main.py"
 start "Node 1 Runner" cmd /c "set MODEL_RUNNER_PORT=8003 && cd node-agent\model-runner && python main.py"
 
-echo Starting Simulated Node 2 (RTX 3050 Ti)...
+echo Starting Simulated Node 2 (1x NVIDIA GTX 1080 Ti)...
 start "Node 2 Agent" cmd /c "set NODE_AGENT_PORT=8011 && cd node-agent\device-service && python main.py"
 start "Node 2 Runner" cmd /c "set MODEL_RUNNER_PORT=8013 && cd node-agent\model-runner && python main.py"
 
