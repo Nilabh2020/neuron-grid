@@ -84,10 +84,10 @@ if (command === 'start') {
     runCmd('Model-Runner', `${pythonCmd} main.py`, runDir);
 } else {
     console.log(`
-🧠 NeuronGrid (neuron-grid) CLI
+🧠 NeuronGrid (NeuronGrid) CLI
 
 Usage:
-  neuron-grid start    # Starts Master Node (Orchestrator, UI, Model Manager, and local Agent)
-  neuron-grid node     # Starts Worker Node Agent (Auto-discovers Orchestrator on LAN via UDP)
+  NeuronGrid start    # Starts Master Node (Orchestrator, UI, Model Manager, and local Agent)
+  NeuronGrid node     # Starts Worker Node Agent (Auto-discovers Orchestrator on LAN via UDP)
 `);
 }

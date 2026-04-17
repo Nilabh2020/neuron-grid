@@ -4,7 +4,7 @@
   "description": "NeuronGrid: Private Local AI Cloud for the Modern Enterprise",
   "main": "cli.js",
   "bin": {
-    "neuron-grid": "./cli.js"
+    "NeuronGrid": "./cli.js"
   },
   "publishConfig": {
     "access": "public"
@@ -12,6 +12,14 @@
   "scripts": {
     "start": "node ./cli.js start"
   },
+  "files": [
+    "cli.js",
+    "cluster-core/**/*",
+    "node-agent/**/*",
+    "web-ui/backend/**/*",
+    "web-ui/frontend/**/*",
+    "README.md"
+  ],
   "keywords": [
     "ai",
     "llm",
