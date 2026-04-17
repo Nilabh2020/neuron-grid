@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("node-agent")
 
 # Constants
-ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
+ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", None)
 NODE_ID = str(uuid.UUID(int=uuid.getnode()))
 HEARTBEAT_INTERVAL = 10 # seconds
 
@@ -44,7 +44,34 @@ class HardwareStats:
             "gpu_usage": [] # Placeholder for future GPU support
         }
 
+def listen_for_orchestrator():
+    global ORCHESTRATOR_URL
+    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    # Enable port reuse and bind to 8888
+    if os.name != 'nt':
+        udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    udp_socket.bind(('', 8888))
+    
+    logger.info("Listening for Orchestrator broadcast on UDP 8888...")
+    while True:
+        try:
+            data, addr = udp_socket.recvfrom(1024)
+            msg = data.decode('utf-8')
+            if msg.startswith("NEURON_ORCHESTRATOR:"):
+                discovered_url = msg.split("NEURON_ORCHESTRATOR:")[1]
+                if ORCHESTRATOR_URL != discovered_url:
+                    logger.info(f"Discovered Orchestrator at {discovered_url}")
+                    ORCHESTRATOR_URL = discovered_url
+                    register_with_orchestrator()
+        except Exception as e:
+            pass
+
 def register_with_orchestrator():
+    if not ORCHESTRATOR_URL:
+        return False
+        
     stats = HardwareStats.get_stats()
     registration_data = {
         "node_id": NODE_ID,
@@ -70,36 +97,35 @@ def register_with_orchestrator():
 def heartbeat_loop():
     logger.info("Starting heartbeat loop...")
     while True:
-        try:
-            metrics = HardwareStats.get_live_metrics()
-            heartbeat_data = {
-                "node_id": NODE_ID,
-                "cpu_usage": metrics["cpu_usage"],
-                "ram_usage": metrics["ram_usage"],
-                "gpu_usage": []
-            }
-            response = requests.post(f"{ORCHESTRATOR_URL}/heartbeat", json=heartbeat_data, timeout=5)
-            if response.status_code == 404:
-                logger.warning("Orchestrator doesn't recognize node. Re-registering...")
-                register_with_orchestrator()
-            
-            logger.debug(f"Heartbeat sent to {ORCHESTRATOR_URL}")
-        except Exception as e:
-            logger.error(f"Failed to send heartbeat: {e}")
+        if ORCHESTRATOR_URL:
+            try:
+                metrics = HardwareStats.get_live_metrics()
+                heartbeat_data = {
+                    "node_id": NODE_ID,
+                    "cpu_usage": metrics["cpu_usage"],
+                    "ram_usage": metrics["ram_usage"],
+                    "gpu_usage": []
+                }
+                response = requests.post(f"{ORCHESTRATOR_URL}/heartbeat", json=heartbeat_data, timeout=5)
+                if response.status_code == 404:
+                    logger.warning("Orchestrator doesn't recognize node. Re-registering...")
+                    register_with_orchestrator()
+                
+            except Exception as e:
+                logger.debug(f"Failed to send heartbeat: {e}")
         
         time.sleep(HEARTBEAT_INTERVAL)
 
 @app.on_event("startup")
 async def startup_event():
-    # Attempt registration on startup
-    if register_with_orchestrator():
-        # Start heartbeat in a separate thread
-        thread = threading.Thread(target=heartbeat_loop, daemon=True)
-        thread.start()
-    else:
-        logger.warning("Initial registration failed. Node will attempt to re-register in heartbeat loop.")
-        thread = threading.Thread(target=heartbeat_loop, daemon=True)
-        thread.start()
+    # Start LAN discovery thread
+    threading.Thread(target=listen_for_orchestrator, daemon=True).start()
+    # Start heartbeat thread
+    threading.Thread(target=heartbeat_loop, daemon=True).start()
+    
+    # Attempt initial registration if URL already set in ENV
+    if ORCHESTRATOR_URL:
+        register_with_orchestrator()
 
 @app.get("/")
 async def status():

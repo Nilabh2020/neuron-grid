@@ -39,7 +39,7 @@ export default function ChatPlayground() {
       <header className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-3xl font-bold mb-1 flex items-center space-x-2">
-            <Sparkles className="text-indigo-400" />
+            <Sparkles className="text-zinc-400" />
             <span>AI Playground</span>
           </h2>
           <p className="text-zinc-500">Test your cluster's inference power.</p>
@@ -47,7 +47,7 @@ export default function ChatPlayground() {
         <select 
           value={model} 
           onChange={(e) => setModel(e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500 transition-colors"
+          className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm outline-none focus:border-white transition-colors"
         >
           <option value="llama-3-8b.gguf">Llama 3 8B (GGUF)</option>
           <option value="mistral-7b.gguf">Mistral 7B (GGUF)</option>
@@ -68,10 +68,10 @@ export default function ChatPlayground() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex items-start space-x-3 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-indigo-600' : 'bg-zinc-800 border border-zinc-700'}`}>
-                {msg.role === 'user' ? <User size={16} /> : <Bot size={16} className="text-indigo-400" />}
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-white text-black' : 'bg-zinc-800 border border-zinc-700'}`}>
+                {msg.role === 'user' ? <User size={16} /> : <Bot size={16} className="text-zinc-400" />}
               </div>
-              <div className={`p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
+              <div className={`p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-white text-black shadow-lg shadow-white/10' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
                 {msg.content}
               </div>
             </div>
@@ -90,7 +90,7 @@ export default function ChatPlayground() {
       {/* Input Bar */}
       <div className="fixed bottom-12 left-[340px] right-24 max-w-5xl mx-auto">
         <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-pink-500 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition-opacity" />
+          <div className="absolute -inset-1 bg-gradient-to-r from-zinc-500 to-zinc-700 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition-opacity" />
           <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl p-2 pr-4 shadow-2xl">
             <input
               type="text"
@@ -103,7 +103,7 @@ export default function ChatPlayground() {
             <button 
               onClick={sendMessage}
               disabled={loading}
-              className="bg-indigo-600 hover:bg-indigo-500 p-3 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20"
+              className="bg-white text-black hover:bg-zinc-200 p-3 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-white/10"
             >
               <Send size={18} />
             </button>

@@ -3,12 +3,42 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import time
 import logging
+import socket
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("orchestrator")
 
 app = FastAPI(title="NeuronGrid Orchestrator")
+
+def broadcast_presence():
+    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    
+    # Get local IP
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = '127.0.0.1'
+    finally:
+        s.close()
+        
+    message = f"NEURON_ORCHESTRATOR:http://{local_ip}:8000".encode('utf-8')
+    
+    while True:
+        try:
+            udp_socket.sendto(message, ('<broadcast>', 8888))
+        except Exception:
+            pass
+        time.sleep(5)
+
+@app.on_event("startup")
+async def startup_event():
+    threading.Thread(target=broadcast_presence, daemon=True).start()
+    logger.info("Started UDP discovery broadcast on port 8888")
 
 # In-memory storage for MVP (will move to SQLite later)
 nodes: Dict[str, dict] = {}

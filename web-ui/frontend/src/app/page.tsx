@@ -37,8 +37,8 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-indigo-500/5 transition-all hover:border-indigo-500/30">
-          <div className="flex items-center space-x-3 mb-4 text-indigo-400">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-white/5 transition-all hover:border-zinc-500">
+          <div className="flex items-center space-x-3 mb-4 text-zinc-300">
             <Server size={24} />
             <h3 className="font-semibold">Compute Nodes</h3>
           </div>
@@ -46,8 +46,8 @@ export default function Dashboard() {
           <div className="mt-2 text-zinc-500 text-sm">Active instances online</div>
         </div>
 
-        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-pink-500/5 transition-all hover:border-pink-500/30">
-          <div className="flex items-center space-x-3 mb-4 text-pink-400">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-white/5 transition-all hover:border-zinc-500">
+          <div className="flex items-center space-x-3 mb-4 text-zinc-300">
             <Cpu size={24} />
             <h3 className="font-semibold">Global RAM</h3>
           </div>
@@ -58,8 +58,8 @@ export default function Dashboard() {
           <div className="mt-2 text-zinc-500 text-sm">Total pool capacity</div>
         </div>
 
-        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-green-500/5 transition-all hover:border-green-500/30">
-          <div className="flex items-center space-x-3 mb-4 text-green-400">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl shadow-xl shadow-white/5 transition-all hover:border-zinc-500">
+          <div className="flex items-center space-x-3 mb-4 text-zinc-300">
             <Activity size={24} />
             <h3 className="font-semibold">Node Status</h3>
           </div>
@@ -82,7 +82,7 @@ export default function Dashboard() {
                   <h4 className="text-lg font-bold">{node.hostname}</h4>
                   <p className="text-zinc-500 text-sm font-mono">{node.ip_address}</p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${node.status === 'online' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${node.status === 'online' ? 'bg-zinc-200 text-black' : 'bg-zinc-800 text-zinc-400'}`}>
                   {node.status}
                 </div>
               </div>
@@ -96,7 +96,7 @@ export default function Dashboard() {
                   <div className="font-bold">{node.ram_gb} GB</div>
                 </div>
               </div>
-              <ArrowUpRight className="absolute bottom-6 right-6 text-zinc-700 group-hover:text-indigo-400 transition-colors" size={24} />
+              <ArrowUpRight className="absolute bottom-6 right-6 text-zinc-700 group-hover:text-white transition-colors" size={24} />
             </div>
           ))}
         </div>
