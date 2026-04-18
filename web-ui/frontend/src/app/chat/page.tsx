@@ -11,6 +11,75 @@ export default function ChatPlayground() {
   const [model, setModel] = useState('');
   const [localModels, setLocalModels] = useState<any[]>([]);
   const [telemetry, setTelemetry] = useState<string | null>(null);
+  const [chatId, setChatId] = useState<string>('');
+
+  useEffect(() => {
+    setChatId(Date.now().toString());
+
+    const handleNewChat = () => {
+      setMessages([]);
+      setChatId(Date.now().toString());
+    };
+    
+    const handleLoadChat = (e: any) => {
+      const id = e.detail;
+      const allChats = JSON.parse(localStorage.getItem('neuron_chats_data') || '{}');
+      if (allChats[id]) {
+        setMessages(allChats[id]);
+        setChatId(id);
+      }
+    };
+
+    window.addEventListener('new_chat_clicked', handleNewChat);
+    window.addEventListener('load_chat_clicked', handleLoadChat);
+    
+    return () => {
+      window.removeEventListener('new_chat_clicked', handleNewChat);
+      window.removeEventListener('load_chat_clicked', handleLoadChat);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0 && chatId) {
+      const allChats = JSON.parse(localStorage.getItem('neuron_chats_data') || '{}');
+      allChats[chatId] = messages;
+      localStorage.setItem('neuron_chats_data', JSON.stringify(allChats));
+      
+      const chatMeta = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
+      if (!chatMeta.find((c: any) => c.id === chatId)) {
+        const title = "New Conversation";
+        chatMeta.unshift({ id: chatId, title });
+        localStorage.setItem('neuron_chats', JSON.stringify(chatMeta));
+        window.dispatchEvent(new Event('chats_updated'));
+        
+        const userMsg = messages.find(m => m.role === 'user');
+        if (userMsg) {
+          generateChatTitle(chatId, userMsg.content);
+        }
+      }
+    }
+  }, [messages, chatId]);
+
+  const generateChatTitle = async (id: string, text: string) => {
+    try {
+      const res = await axios.post('http://localhost:3001/api/chat', {
+        model: model,
+        messages: [{ role: 'user', content: `Summarize this prompt in 2 to 4 words. Respond ONLY with the title and nothing else. No quotes, no intro. Prompt: "${text}"` }],
+        stream: false
+      });
+      const title = res.data.choices[0].message.content.replace(/["']/g, '').trim();
+      
+      const chatMeta = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
+      const chatIndex = chatMeta.findIndex((c: any) => c.id === id);
+      if (chatIndex >= 0) {
+        chatMeta[chatIndex].title = title;
+        localStorage.setItem('neuron_chats', JSON.stringify(chatMeta));
+        window.dispatchEvent(new Event('chats_updated'));
+      }
+    } catch (err) {
+      console.error("Title generation failed", err);
+    }
+  };
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -38,12 +107,15 @@ export default function ChatPlayground() {
     setTelemetry("Initializing neural link...");
 
     try {
+      const systemPrompt = { role: 'system', content: 'You are Neuron, an advanced, highly intelligent AI running locally. Answer naturally, directly, and brilliantly. NEVER act like a generic robotic assistant. NEVER say things like "I notice you sent a greeting". Just answer conversationally and concisely.' };
+      const apiMessages = [systemPrompt, ...newMessages];
+
       const response = await fetch('http://localhost:3001/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: model,
-          messages: newMessages,
+          messages: apiMessages,
           stream: true
         })
       });
@@ -114,8 +186,8 @@ export default function ChatPlayground() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col max-w-5xl mx-auto relative">
-      <header className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-6">
+    <div className="h-[calc(100vh)] flex flex-col max-w-5xl mx-auto relative p-8">
+      <header className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-6 shrink-0">
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight text-white mb-2 flex items-center space-x-3">
             <Sparkles className="text-zinc-400" size={32} />
@@ -144,7 +216,7 @@ export default function ChatPlayground() {
       </header>
 
       {/* Chat History */}
-      <div className="flex-1 overflow-y-auto space-y-6 pb-32 pr-4 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-6 pb-6 pr-4 custom-scrollbar">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-40">
             <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center shadow-2xl">
@@ -183,7 +255,7 @@ export default function ChatPlayground() {
       </div>
 
       {/* Input Bar */}
-      <div className="absolute bottom-6 left-0 right-0 max-w-4xl mx-auto">
+      <div className="shrink-0 pt-6 pb-2 w-full mx-auto">
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-zinc-500 to-zinc-800 rounded-3xl blur opacity-10 group-focus-within:opacity-30 transition-opacity duration-500" />
           <div className="relative flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl p-2.5 pr-3 shadow-2xl">

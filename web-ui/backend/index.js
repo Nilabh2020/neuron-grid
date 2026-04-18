@@ -199,23 +199,30 @@ app.get('/api/models/downloads', (req, res) => {
     res.json(activeDownloads);
 });
 
+// Proxy Chat Completions with Streaming Support
 app.post('/api/chat', async (req, res) => {
     try {
-        const response = await axios({
-            method: 'POST',
-            url: `${ORCHESTRATOR_URL}/v1/chat/completions`,
-            data: req.body,
-            responseType: 'stream'
-        });
+        const isStream = req.body.stream !== false;
 
-        // Set headers for SSE (Server-Sent Events)
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
+        if (isStream) {
+            const response = await axios({
+                method: 'POST',
+                url: `${ORCHESTRATOR_URL}/v1/chat/completions`,
+                data: req.body,
+                responseType: 'stream'
+            });
 
-        // Pipe the AI's thoughts directly to your browser
-        response.data.pipe(res);
-        
+            // Set headers for SSE (Server-Sent Events)
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            // Pipe the AI's thoughts directly to your browser
+            response.data.pipe(res);
+        } else {
+            const response = await axios.post(`${ORCHESTRATOR_URL}/v1/chat/completions`, req.body);
+            res.json(response.data);
+        }
     } catch (error) {
         console.error("Inference Proxy Error:", error.message);
         res.status(500).json({ error: 'Inference failed: Cluster unreachable or model load timeout' });
