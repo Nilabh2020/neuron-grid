@@ -201,10 +201,24 @@ app.get('/api/models/downloads', (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
     try {
-        const response = await axios.post(`${ORCHESTRATOR_URL}/v1/chat/completions`, req.body);
-        res.json(response.data);
+        const response = await axios({
+            method: 'POST',
+            url: `${ORCHESTRATOR_URL}/v1/chat/completions`,
+            data: req.body,
+            responseType: 'stream'
+        });
+
+        // Set headers for SSE (Server-Sent Events)
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Pipe the AI's thoughts directly to your browser
+        response.data.pipe(res);
+        
     } catch (error) {
-        res.status(500).json({ error: 'Inference failed' });
+        console.error("Inference Proxy Error:", error.message);
+        res.status(500).json({ error: 'Inference failed: Cluster unreachable or model load timeout' });
     }
 });
 

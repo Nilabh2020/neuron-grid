@@ -26,7 +26,7 @@ logger = logging.getLogger("model-runner")
 app = FastAPI(title="NeuronGrid Model Runner (Distributed)")
 
 # Storage paths
-MODELS_DIR = os.getenv("MODELS_DIR", "./models")
+MODELS_DIR = os.getenv("MODELS_DIR", os.path.join(os.path.expanduser("~"), ".neurongrid", "models"))
 BIN_DIR = os.path.join(os.getcwd(), "bin")
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(BIN_DIR, exist_ok=True)
@@ -34,30 +34,34 @@ os.makedirs(BIN_DIR, exist_ok=True)
 # State
 rpc_process = None
 master_process = None
+current_model_path = None
 
 def get_binary_info():
     """Detects the current OS and CPU architecture to fetch the correct llama.cpp binary."""
     system = platform.system().lower()
     machine = platform.machine().lower()
-    base_url = "https://github.com/ggerganov/llama.cpp/releases/download/b2640/"
     
     if system == "windows":
-        return base_url + "llama-b2640-bin-win-avx2-x64.zip", ".exe"
-    elif system == "darwin": # macOS and iOS devices running desktop binaries
-        if "arm" in machine or "aarch64" in machine:
-            return base_url + "llama-b2640-bin-macos-arm64.zip", ""
-        else:
-            return base_url + "llama-b2640-bin-macos-x64.zip", ""
-    else: # Linux and others
-        return base_url + "llama-b2640-bin-ubuntu-x64.zip", ""
+        # Upgraded to b8838 Vulkan to support Qwen2/Gemma2 architectures AND utilize GPU VRAM out of the box
+        base_url = "https://github.com/ggerganov/llama.cpp/releases/download/b8838/"
+        return base_url + "llama-b8838-bin-win-vulkan-x64.zip", ".exe"
+    else:
+        # Legacy b3600 for macOS/Linux to maintain .zip extraction compatibility
+        base_url = "https://github.com/ggerganov/llama.cpp/releases/download/b3600/"
+        if system == "darwin": # macOS and iOS devices running desktop binaries
+            if "arm" in machine or "aarch64" in machine:
+                return base_url + "llama-b3600-bin-macos-arm64.zip", ""
+            else:
+                return base_url + "llama-b3600-bin-macos-x64.zip", ""
+        else: # Linux and others
+            return base_url + "llama-b3600-bin-ubuntu-x64.zip", ""
 
 def ensure_binaries():
     """Downloads llama.cpp binaries if they don't exist based on OS."""
     url, ext = get_binary_info()
     llama_server = os.path.join(BIN_DIR, f"llama-server{ext}")
-    llama_rpc = os.path.join(BIN_DIR, f"llama-rpc-server{ext}")
     
-    if os.path.exists(llama_server) and os.path.exists(llama_rpc):
+    if os.path.exists(llama_server):
         return
         
     logger.info(f"Downloading llama.cpp binaries for {platform.system()} ({platform.machine()})...")
@@ -78,7 +82,10 @@ def ensure_binaries():
     if ext == "":
         try:
             os.chmod(llama_server, os.stat(llama_server).st_mode | stat.S_IEXEC)
-            os.chmod(llama_rpc, os.stat(llama_rpc).st_mode | stat.S_IEXEC)
+            rpc_exe_old = os.path.join(BIN_DIR, "llama-rpc-server")
+            rpc_exe_new = os.path.join(BIN_DIR, "rpc-server")
+            if os.path.exists(rpc_exe_old): os.chmod(rpc_exe_old, os.stat(rpc_exe_old).st_mode | stat.S_IEXEC)
+            if os.path.exists(rpc_exe_new): os.chmod(rpc_exe_new, os.stat(rpc_exe_new).st_mode | stat.S_IEXEC)
         except Exception as e:
             logger.warning(f"Could not automatically set executable permissions: {e}")
             
@@ -138,7 +145,9 @@ async def start_rpc_server():
         return {"status": "RPC server already running on port 50052"}
         
     _, ext = get_binary_info()
-    rpc_exe = os.path.join(BIN_DIR, f"llama-rpc-server{ext}")
+    rpc_exe_old = os.path.join(BIN_DIR, f"llama-rpc-server{ext}")
+    rpc_exe_new = os.path.join(BIN_DIR, f"rpc-server{ext}")
+    rpc_exe = rpc_exe_new if os.path.exists(rpc_exe_new) else rpc_exe_old
     
     if not os.path.exists(rpc_exe):
         raise HTTPException(status_code=503, detail="Binaries not ready yet. Please wait.")
@@ -154,6 +163,7 @@ async def start_rpc_server():
 async def create_completion(req: Request):
     """Act as the Master Node: Launch llama-server with RPC and proxy the request."""
     global master_process
+    global current_model_path
     body = await req.json()
     
     filename = body.get("model_name")
@@ -166,28 +176,63 @@ async def create_completion(req: Request):
     _, ext = get_binary_info()
     server_exe = os.path.join(BIN_DIR, f"llama-server{ext}")
     
-    if master_process:
+    if master_process and current_model_path != filepath:
+        logger.info(f"Switching models from {current_model_path} to {filepath}")
         master_process.terminate()
         master_process.wait()
+        master_process = None
         
-    cmd = [
-        server_exe,
-        "-m", filepath,
-        "--port", "8080",
-        "-c", "2048",
-        "--host", "127.0.0.1"
-    ]
-    
-    if rpc_servers:
-        cmd.extend(["--rpc", rpc_servers])
-        logger.info(f"Master Node: Offloading layers to {rpc_servers}")
-    else:
-        logger.info("Master Node: Running locally (No RPC workers provided)")
+    if not master_process or master_process.poll() is not None:
+        cmd = [
+            server_exe,
+            "-m", filepath,
+            "--port", "8080",
+            "-c", "2048",
+            "--host", "127.0.0.1"
+        ]
         
-    master_process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    time.sleep(3) 
-    
+        if rpc_servers:
+            cmd.extend(["--rpc", rpc_servers])
+            logger.info(f"Master Node: Offloading layers to {rpc_servers}")
+        else:
+            logger.info("Master Node: Running locally (No RPC workers provided)")
+            
+        log_file = open("llama_server.log", "w")
+        master_process = subprocess.Popen(cmd, stdout=log_file, stderr=log_file)
+        current_model_path = filepath
+        
+        logger.info("Waiting for llama-server to initialize model weights (polling health)...")
+        
+        # Smart Polling: Wait up to 60 seconds for the model to load
+        start_time = time.time()
+        is_ready = False
+        while time.time() - start_time < 60:
+            if master_process.poll() is not None:
+                # The process crashed! Read the log to find out why.
+                try:
+                    with open("llama_server.log", "r") as f:
+                        log_content = f.read()
+                        # Extract the error line
+                        error_lines = [line for line in log_content.split('\n') if 'error' in line.lower() or 'err' in line.lower()]
+                        crash_reason = error_lines[-1] if error_lines else "Unknown crash reason."
+                except:
+                    crash_reason = "Could not read llama_server.log"
+                logger.error(f"llama-server crashed during boot: {crash_reason}")
+                raise HTTPException(status_code=500, detail=f"AI Engine crashed: {crash_reason}")
+                
+            try:
+                health_check = requests.get("http://127.0.0.1:8080/health", timeout=1)
+                if health_check.status_code == 200:
+                    is_ready = True
+                    break
+            except:
+                pass
+            time.sleep(1)
+            
+        if not is_ready:
+            logger.error("llama-server failed to start within 60 seconds")
+            raise HTTPException(status_code=504, detail="AI engine timed out while loading weights.")
+
     try:
         openai_req = {
             "messages": body.get("messages"),
@@ -196,9 +241,11 @@ async def create_completion(req: Request):
             "stream": body.get("stream", False)
         }
         
+        logger.info("Proxying request to internal llama-server on port 8080")
+        
         if openai_req["stream"]:
             response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, stream=True)
-            return StreamingResponse(response.iter_lines(), media_type="text/event-stream")
+            return StreamingResponse(response.iter_content(chunk_size=None), media_type="text/event-stream")
         else:
             response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req)
             return response.json()

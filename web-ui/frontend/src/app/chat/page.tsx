@@ -28,26 +28,74 @@ export default function ChatPlayground() {
   }, []);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !model) return;
     
-    const newMessages = [...messages, { role: 'user', content: input }];
-    setMessages(newMessages);
+    const userMessage = { role: 'user', content: input };
+    const newMessages = [...messages, userMessage];
+    setMessages([...newMessages, { role: 'assistant', content: '' }]); // Placeholder for AI response
     setInput('');
     setLoading(true);
-    setTelemetry("Profiling heterogeneous cluster...");
+    setTelemetry("Initializing neural link...");
 
     try {
-      const res = await axios.post('http://localhost:3001/api/chat', {
-        model: model,
-        messages: newMessages,
-        stream: false
+      const response = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model,
+          messages: newMessages,
+          stream: true
+        })
       });
+
+      if (!response.ok) throw new Error('Failed to reach cluster');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = '';
+      let buffer = '';
+
+      setTelemetry("Inference in progress...");
+
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // keep the last incomplete chunk in the buffer
+        
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('data: ')) {
+                const data = trimmedLine.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                    const json = JSON.parse(data);
+                    const token = json.choices[0].delta?.content || '';
+                    assistantContent += token;
+                    
+                    // Update the last message in state with the new content
+                    setMessages(prev => {
+                        const updated = [...prev];
+                        updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+                        return updated;
+                    });
+                } catch (e) {
+                    // Ignore incomplete JSON
+                }
+            }
+        }
+      }
       
-      setMessages([...newMessages, { role: 'assistant', content: res.data.content }]);
-      setTelemetry("Inference complete. Awaiting next prompt.");
+      setTelemetry("Inference complete. Cluster nominal.");
     } catch (err) {
       console.error("Chat error", err);
-      setMessages([...newMessages, { role: 'assistant', content: "Error: Failed to reach cluster or orchestrator." }]);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'assistant', content: "Error: Failed to reach cluster or model load timeout." };
+        return updated;
+      });
       setTelemetry("Cluster connection failed.");
     } finally {
       setLoading(false);

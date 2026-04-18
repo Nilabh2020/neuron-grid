@@ -5,6 +5,7 @@ import time
 import logging
 import socket
 import threading
+import requests
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -155,6 +156,11 @@ async def chat_completions(req: ChatCompletionRequest):
 
     # 2. Route the main request to the Master Node, passing the RPC cluster info
     master_ip = master_node.get("ip_address", "localhost")
+    
+    # Solo Mode Resilience: If we are running on the same machine, use localhost to bypass firewall
+    if master_ip == socket.gethostbyname(socket.gethostname()) or len(active_nodes) == 1:
+        master_ip = "localhost"
+        
     master_url = f"http://{master_ip}:8003/completions"
     rpc_servers = ",".join(worker_ips)
     
@@ -165,18 +171,29 @@ async def chat_completions(req: ChatCompletionRequest):
             "stream": req.stream,
             "max_tokens": req.max_tokens,
             "temperature": req.temperature,
-            "rpc_servers": rpc_servers # Pass the cluster pool to the master!
+            "rpc_servers": rpc_servers
         }
         
-        logger.info(f"Routing job to Master ({master_ip}) with Workers ({rpc_servers})")
+        logger.info(f"Routing job to Master ({master_ip}) with model ({req.model})")
         
+        # Large models take time to load into VRAM, increasing timeout to 60s
         if req.stream:
-            response = requests.post(master_url, json=runner_req, stream=True)
-            return StreamingResponse(response.iter_lines(), media_type="text/event-stream")
+            response = requests.post(master_url, json=runner_req, stream=True, timeout=60)
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Stream failed")
+            from fastapi.responses import StreamingResponse
+            return StreamingResponse(response.iter_content(chunk_size=None), media_type="text/event-stream")
         else:
-            response = requests.post(master_url, json=runner_req)
+            response = requests.post(master_url, json=runner_req, timeout=60)
+            if response.status_code != 200:
+                error_detail = response.json().get("detail", "Unknown runner error")
+                logger.error(f"Runner returned error {response.status_code}: {error_detail}")
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
             return response.json()
             
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Could not connect to Model Runner at {master_url}")
+        raise HTTPException(status_code=503, detail=f"Model Runner at {master_ip}:8003 is unreachable")
     except Exception as e:
         logger.error(f"Routing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
