@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Cpu, Server, Activity, ArrowUpRight, HardDrive, User, Users, ShieldCheck, Globe } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -122,13 +123,27 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <motion.div 
+          initial="hidden" animate="visible"
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+          }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-8"
+        >
           {[
             { label: 'Compute Nodes', val: isSolo ? '1' : stats?.online_nodes, total: isSolo ? '1' : stats?.total_nodes, icon: <Server size={24} />, desc: 'System hardware presence' },
             { label: 'Neural Memory', val: filteredNodes.reduce((acc: any, n: any) => acc + (n?.ram_gb || 0), 0).toFixed(1), unit: 'GB', icon: <HardDrive size={24} />, desc: 'Total aggregate memory' },
             { label: 'Infrastructure', val: 'NOMINAL', icon: <Activity size={24} />, desc: 'Real-time engine status' }
           ].map((card, i) => (
-            <div key={i} className="bg-zinc-950 border border-zinc-900 p-8 rounded-[2rem] hover:border-zinc-500 transition-all duration-500 group relative overflow-hidden">
+            <motion.div 
+              key={i}
+              variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
+              }}
+              className="bg-zinc-950 border border-zinc-900 p-8 rounded-[2rem] hover:border-zinc-500 transition-all duration-500 group relative overflow-hidden"
+            >
               <div className="flex items-center space-x-4 mb-8 text-zinc-600 group-hover:text-white transition-colors">
                 {card.icon}
                 <h3 className="font-black text-[10px] uppercase tracking-[0.3em]">{card.label}</h3>
@@ -142,9 +157,9 @@ export default function Dashboard() {
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
                 <ArrowUpRight size={48} />
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Node Inventory */}
         <div className="space-y-8 pb-20">

@@ -6,6 +6,7 @@ import {
   Search, SlidersHorizontal, RotateCw, CheckCircle2, Eye, Wrench, Info, 
   Bot, Copy, X, Download, Star, Sparkles, Box, FileDown, ThumbsUp, AlertTriangle, User, Loader2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const FALLBACK_MODELS = [
   {

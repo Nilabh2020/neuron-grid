@@ -7,6 +7,7 @@ import {
   ChevronRight, ChevronDown, Activity, TerminalSquare, SlidersHorizontal, ArrowRight, Folder, Bot,
   MessageSquare, FileDown, Loader2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LocalModelsPage() {
   const [models, setModels] = useState<any[]>([]);
@@ -131,45 +132,58 @@ export default function LocalModelsPage() {
                 No local models found on disk.
               </div>
             ) : (
-              filteredModels.map((model) => {
-                const isSelected = selectedModelId === model.id;
-                return (
-                  <div 
-                    key={model.id}
-                    onClick={() => setSelectedModelId(model.id)}
-                    className={`grid grid-cols-[1fr_1fr_1.5fr_2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-3 items-center rounded-xl cursor-pointer border transition-all ${
-                      isSelected 
-                        ? 'bg-zinc-900 border-zinc-700 shadow-lg' 
-                        : 'bg-black border-transparent hover:bg-zinc-950 hover:border-zinc-900'
-                    }`}
-                  >
-                    <div>
-                      <span className="border border-zinc-800 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider text-zinc-300">{model.arch}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs font-black uppercase tracking-widest text-zinc-300">{model.params}</span>
-                    </div>
-                    <div className="text-xs font-bold text-zinc-400 truncate pr-4">{model.publisher}</div>
-                    <div className="flex items-center space-x-2 truncate">
-                      <span className={`text-sm font-black truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`} title={model.name}>{model.name}</span>
-                      <div className="flex items-center space-x-1 shrink-0">
-                        {model.capabilities.includes('vision') && <div className="border border-zinc-800 text-yellow-600 rounded px-1 py-0.5"><Eye size={10} /></div>}
-                        {model.capabilities.includes('tool') && <div className="border border-zinc-800 text-blue-600 rounded px-1 py-0.5"><Wrench size={10} /></div>}
-                        {model.capabilities.includes('text') && <div className="border border-zinc-800 text-green-600 rounded px-1 py-0.5"><Info size={10} /></div>}
+              <motion.div 
+                initial="hidden" animate="visible"
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+                }}
+                className="space-y-1"
+              >
+                {filteredModels.map((model) => {
+                  const isSelected = selectedModelId === model.id;
+                  return (
+                    <motion.div 
+                      key={model.id}
+                      variants={{
+                        hidden: { opacity: 0, x: -20 },
+                        visible: { opacity: 1, x: 0 }
+                      }}
+                      onClick={() => setSelectedModelId(model.id)}
+                      className={`grid grid-cols-[1fr_1fr_1.5fr_2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-3 items-center rounded-xl cursor-pointer border transition-all ${
+                        isSelected 
+                          ? 'bg-zinc-900 border-zinc-700 shadow-lg' 
+                          : 'bg-black border-transparent hover:bg-zinc-950 hover:border-zinc-900'
+                      }`}
+                    >
+                      <div>
+                        <span className="border border-zinc-800 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider text-zinc-300">{model.arch}</span>
                       </div>
-                    </div>
-                    <div>
-                      <span className="border border-zinc-800 bg-zinc-950 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider text-zinc-300">{model.quant}</span>
-                    </div>
-                    <div className="text-xs font-black tracking-widest text-zinc-400">{model.size_gb} GB</div>
-                    <div className="text-xs font-bold text-zinc-500">{formatTimeAgo(model.modifiedMs)}</div>
-                    <div className="flex items-center justify-end space-x-2 w-16">
-                      <button className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded transition-colors"><MoreHorizontal size={14} /></button>
-                      <button className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded transition-colors"><Settings size={14} /></button>
-                    </div>
-                  </div>
-                );
-              })
+                      <div>
+                        <span className="text-xs font-black uppercase tracking-widest text-zinc-300">{model.params}</span>
+                      </div>
+                      <div className="text-xs font-bold text-zinc-400 truncate pr-4">{model.publisher}</div>
+                      <div className="flex items-center space-x-2 truncate">
+                        <span className={`text-sm font-black truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`} title={model.name}>{model.name}</span>
+                        <div className="flex items-center space-x-1 shrink-0">
+                          {model.capabilities.includes('vision') && <div className="border border-zinc-800 text-yellow-600 rounded px-1 py-0.5"><Eye size={10} /></div>}
+                          {model.capabilities.includes('tool') && <div className="border border-zinc-800 text-blue-600 rounded px-1 py-0.5"><Wrench size={10} /></div>}
+                          {model.capabilities.includes('text') && <div className="border border-zinc-800 text-green-600 rounded px-1 py-0.5"><Info size={10} /></div>}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="border border-zinc-800 bg-zinc-950 px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider text-zinc-300">{model.quant}</span>
+                      </div>
+                      <div className="text-xs font-black tracking-widest text-zinc-400">{model.size_gb} GB</div>
+                      <div className="text-xs font-bold text-zinc-500">{formatTimeAgo(model.modifiedMs)}</div>
+                      <div className="flex items-center justify-end space-x-2 w-16">
+                        <button className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded transition-colors"><MoreHorizontal size={14} /></button>
+                        <button className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded transition-colors"><Settings size={14} /></button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
             )}
           </div>
 

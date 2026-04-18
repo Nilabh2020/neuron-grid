@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Send, User, Bot, Sparkles, Activity, Network } from 'lucide-react';
 import { marked } from 'marked';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPlayground() {
   const [messages, setMessages] = useState<any[]>([]);
@@ -13,6 +14,15 @@ export default function ChatPlayground() {
   const [localModels, setLocalModels] = useState<any[]>([]);
   const [telemetry, setTelemetry] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string>('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   useEffect(() => {
     setChatId(Date.now().toString());
@@ -218,45 +228,64 @@ export default function ChatPlayground() {
 
       {/* Chat History */}
       <div className="flex-1 overflow-y-auto space-y-6 pb-6 pr-4 custom-scrollbar min-h-0">
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-40">
-            <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center shadow-2xl">
-              <MessageSquare size={40} className="text-zinc-500" />
-            </div>
-            <p className="text-2xl font-medium italic text-zinc-500">"Tell me a story about a decentralized AI cluster..."</p>
-          </div>
-        )}
-        
-        {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex items-start space-x-4 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-white text-black' : 'bg-zinc-900 border border-zinc-700 text-white'}`}>
-                {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+        <AnimatePresence>
+          {messages.length === 0 && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 0.4, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col items-center justify-center text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center shadow-2xl">
+                <MessageSquare size={40} className="text-zinc-500" />
               </div>
-              <div className={`p-5 rounded-2xl text-base leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50 prose prose-invert max-w-none prose-p:leading-relaxed prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800'}`}>
-                {msg.role === 'user' ? (
-                  msg.content
-                ) : (
-                  <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }} />
-                )}
+              <p className="text-2xl font-medium italic text-zinc-500">"Tell me a story about a decentralized AI cluster..."</p>
+            </motion.div>
+          )}
+          
+          {messages.map((msg, i) => (
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex items-start space-x-4 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-white text-black' : 'bg-zinc-900 border border-zinc-700 text-white'}`}>
+                  {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+                </div>
+                <div className={`p-5 rounded-2xl text-base leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50 prose prose-invert max-w-none prose-p:leading-relaxed prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800'}`}>
+                  {msg.role === 'user' ? (
+                    msg.content
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }} />
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse">
-                <Bot size={20} className="text-zinc-600" />
+            </motion.div>
+          ))}
+          {loading && (
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex justify-start"
+            >
+              <div className="flex items-start space-x-4">
+                <div className="w-10 h-10 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse">
+                  <Bot size={20} className="text-zinc-600" />
+                </div>
+                <div className="p-5 bg-[#111] border border-zinc-800 rounded-2xl w-24 flex items-center justify-center space-x-2">
+                  <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
-              <div className="p-5 bg-[#111] border border-zinc-800 rounded-2xl w-24 flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-zinc-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Bar */}
