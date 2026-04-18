@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Send, User, Bot, Sparkles, Activity, Network } from 'lucide-react';
+import { marked } from 'marked';
 
 export default function ChatPlayground() {
   const [messages, setMessages] = useState<any[]>([]);
@@ -107,7 +108,7 @@ export default function ChatPlayground() {
     setTelemetry("Initializing neural link...");
 
     try {
-      const systemPrompt = { role: 'system', content: 'You are Neuron, an advanced, highly intelligent AI running locally. Answer naturally, directly, and brilliantly. NEVER act like a generic robotic assistant. NEVER say things like "I notice you sent a greeting". Just answer conversationally and concisely.' };
+      const systemPrompt = { role: 'system', content: 'You are Neuron, a brilliant, direct, and concise AI running locally on an enterprise cluster. Answer the user\'s prompt immediately without any conversational filler. NEVER use greetings like "Hello" or "I am doing well". NEVER give robotic disclaimers. Go straight to the answer.' };
       const apiMessages = [systemPrompt, ...newMessages];
 
       const response = await fetch('http://localhost:3001/api/chat', {
@@ -216,7 +217,7 @@ export default function ChatPlayground() {
       </header>
 
       {/* Chat History */}
-      <div className="flex-1 overflow-y-auto space-y-6 pb-6 pr-4 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-6 pb-6 pr-4 custom-scrollbar min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-40">
             <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-3xl flex items-center justify-center shadow-2xl">
@@ -232,8 +233,12 @@ export default function ChatPlayground() {
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-white text-black' : 'bg-zinc-900 border border-zinc-700 text-white'}`}>
                 {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
               </div>
-              <div className={`p-5 rounded-2xl text-base leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50'}`}>
-                {msg.content}
+              <div className={`p-5 rounded-2xl text-base leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50 prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800'}`}>
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }} />
+                )}
               </div>
             </div>
           </div>
