@@ -32,7 +32,7 @@ export default function ChatPlayground() {
     
     const userMessage = { role: 'user', content: input };
     const newMessages = [...messages, userMessage];
-    setMessages([...newMessages, { role: 'assistant', content: '' }]); // Placeholder for AI response
+    setMessages(newMessages);
     setInput('');
     setLoading(true);
     setTelemetry("Initializing neural link...");
@@ -54,6 +54,7 @@ export default function ChatPlayground() {
       const decoder = new TextDecoder();
       let assistantContent = '';
       let buffer = '';
+      let isFirstToken = true;
 
       setTelemetry("Inference in progress...");
 
@@ -73,14 +74,24 @@ export default function ChatPlayground() {
                 try {
                     const json = JSON.parse(data);
                     const token = json.choices[0].delta?.content || '';
-                    assistantContent += token;
-                    
-                    // Update the last message in state with the new content
-                    setMessages(prev => {
-                        const updated = [...prev];
-                        updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                        return updated;
-                    });
+                    if (token) {
+                        if (isFirstToken) {
+                            setLoading(false);
+                            isFirstToken = false;
+                        }
+                        assistantContent += token;
+                        
+                        // Update the last message in state with the new content
+                        setMessages(prev => {
+                            const updated = [...prev];
+                            if (updated.length > 0 && updated[updated.length - 1].role === 'user') {
+                                updated.push({ role: 'assistant', content: assistantContent });
+                            } else {
+                                updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+                            }
+                            return updated;
+                        });
+                    }
                 } catch (e) {
                     // Ignore incomplete JSON
                 }
@@ -93,7 +104,7 @@ export default function ChatPlayground() {
       console.error("Chat error", err);
       setMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1] = { role: 'assistant', content: "Error: Failed to reach cluster or model load timeout." };
+        updated.push({ role: 'assistant', content: "Error: Failed to reach cluster or model load timeout." });
         return updated;
       });
       setTelemetry("Cluster connection failed.");
