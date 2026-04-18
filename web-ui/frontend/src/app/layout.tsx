@@ -43,6 +43,22 @@ export default function RootLayout({
               <MessageSquare size={20} />
               <span>Playground</span>
             </Link>
+            
+            <div className="pt-8 pb-2">
+              <div className="px-3 text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                Chats
+              </div>
+            </div>
+            
+            {/* Mock chat sessions */}
+            <div className="flex items-center space-x-3 px-3 py-2 rounded-xl text-zinc-500 hover:text-white cursor-pointer transition-colors">
+               <div className="w-1.5 h-1.5 rounded-full bg-zinc-700"></div>
+               <span className="text-sm font-medium truncate">Heterogeneous Load Balancing</span>
+            </div>
+            <div className="flex items-center space-x-3 px-3 py-2 rounded-xl text-zinc-500 hover:text-white cursor-pointer transition-colors">
+               <div className="w-1.5 h-1.5 rounded-full bg-zinc-700"></div>
+               <span className="text-sm font-medium truncate">System Prompt Tuning</span>
+            </div>
           </nav>
 
           <div className="mt-auto pt-6 border-t border-zinc-800">

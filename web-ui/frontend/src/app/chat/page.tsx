@@ -149,7 +149,7 @@ export default function ChatPlayground() {
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-white text-black' : 'bg-zinc-900 border border-zinc-700 text-white'}`}>
                 {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
               </div>
-              <div className={`p-5 rounded-2xl text-base leading-relaxed ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50'}`}>
+              <div className={`p-5 rounded-2xl text-base leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'bg-white text-black font-medium' : 'bg-[#111] border border-zinc-800 text-zinc-300 shadow-2xl shadow-black/50'}`}>
                 {msg.content}
               </div>
             </div>
@@ -198,6 +198,23 @@ export default function ChatPlayground() {
           <span>Powered by NeuronGrid Orchestrator • Asymmetric Tensor Parallelism Active</span>
         </div>
       </div>
+      
+      {/* Global styling for custom scrollbar to match enterprise dark theme */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #18181b;
+          border-radius: 20px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: #27272a;
+        }
+      `}} />
     </div>
   );
 }
