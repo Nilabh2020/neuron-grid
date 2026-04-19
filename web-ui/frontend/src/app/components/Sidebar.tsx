@@ -16,6 +16,7 @@ export default function Sidebar() {
   const loadChats = async () => {
     try {
       const res = await axios.get('http://localhost:3001/api/chats');
+      console.log('Loaded chats:', res.data);
       setChats(res.data);
     } catch (err) {
       console.error('Failed to load chats:', err);
@@ -47,15 +48,19 @@ export default function Sidebar() {
   const handleLoadChat = (id: string) => {
     setActiveChat(id);
     window.dispatchEvent(new CustomEvent('load_chat_clicked', { detail: id }));
-    router.push('/chat');
+    if (pathname !== '/chat') {
+      router.push('/chat');
+    }
   };
 
   const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Delete this chat?')) return;
     
     try {
       await axios.delete(`http://localhost:3001/api/chats/${id}`);
+      if (activeChat === id) {
+        setActiveChat(null);
+      }
       loadChats();
     } catch (err) {
       console.error('Failed to delete chat:', err);
@@ -69,8 +74,8 @@ export default function Sidebar() {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="w-64 border-r border-zinc-800 flex flex-col p-6 space-y-8 bg-zinc-950/50 backdrop-blur-xl shrink-0"
     >
-      <div className="flex items-center space-x-2 px-2">
-        <div className="w-8 h-8 bg-gradient-to-tr from-zinc-400 to-zinc-700 rounded-lg shadow-lg shadow-white/10" />
+      <div className="flex items-center space-x-3 px-2">
+        <img src="/logo.png" alt="NeuronGrid" className="w-8 h-8 rounded-lg" />
         <h1 className="text-xl font-bold tracking-tight text-white">NeuronGrid</h1>
       </div>
 
@@ -121,45 +126,83 @@ export default function Sidebar() {
             </button>
         </motion.div>
         
-        <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar pr-2">
+        <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
             {chats.length === 0 ? (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-3 py-2 text-xs text-zinc-600 italic font-medium">No recent chats</motion.div>
+                <div className="px-3 py-2 text-xs text-zinc-400 italic font-medium">No recent chats</div>
             ) : (
-                <motion.div 
-                  initial="hidden" animate="visible"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.2 } }
-                  }}
-                >
+                <div className="space-y-2">
                   {chats.map(chat => {
                     const isActive = activeChat === chat.id;
                     return (
-                      <motion.div 
+                      <div 
                           key={chat.id} 
-                          variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
                           onClick={() => handleLoadChat(chat.id)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all group ${
-                            isActive 
-                              ? 'bg-white/10 text-white' 
-                              : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
-                          }`}
+                          style={{ 
+                            backgroundColor: isActive ? '#ffffff' : '#27272a', 
+                            color: isActive ? '#000000' : '#ffffff', 
+                            border: '1px solid', 
+                            borderColor: isActive ? '#ffffff' : '#3f3f46',
+                            padding: '8px 10px',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isActive) {
+                              e.currentTarget.style.backgroundColor = '#3f3f46';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isActive) {
+                              e.currentTarget.style.backgroundColor = '#27272a';
+                            }
+                          }}
                       >
-                          <div className="flex items-center space-x-3 min-w-0 flex-1">
-                              <MessageCircle size={14} className="shrink-0" />
-                              <span className={`text-sm font-medium truncate transition-colors ${isActive ? 'text-white' : 'group-hover:text-white'}`}>{chat.title}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <MessageCircle size={14} style={{ flexShrink: 0 }} />
+                              <span style={{ 
+                                fontSize: '13px', 
+                                fontWeight: 500, 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis', 
+                                whiteSpace: 'nowrap',
+                                lineHeight: '1.4'
+                              }}>{chat.title}</span>
                           </div>
                           <button
                               onClick={(e) => handleDeleteChat(chat.id, e)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all shrink-0"
+                              style={{ 
+                                padding: '4px',
+                                borderRadius: '6px',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                color: isActive ? '#71717a' : '#52525b'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                                e.currentTarget.style.color = '#ef4444';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = isActive ? '#71717a' : '#52525b';
+                              }}
                               title="Delete chat"
                           >
-                              <Trash2 size={12} className="text-zinc-600 hover:text-red-400" />
+                              <Trash2 size={14} />
                           </button>
-                      </motion.div>
+                      </div>
                     );
                   })}
-                </motion.div>
+                </div>
             )}
         </div>
       </nav>
