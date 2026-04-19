@@ -20,6 +20,7 @@ export default function LocalModelsPage() {
   // State for configuration
   const [systemPrompt, setSystemPrompt] = useState('You are Neuron, a highly capable AI assistant running securely on a private local cluster. You are helpful, precise, and concise.');
   const [contextLength, setContextLength] = useState(8192);
+  const [reloadingModel, setReloadingModel] = useState(false);
 
   useEffect(() => {
     const fetchLocalModels = async () => {
@@ -37,6 +38,44 @@ export default function LocalModelsPage() {
     };
     fetchLocalModels();
   }, [selectedModelId]);
+
+  // Load config when model is selected
+  useEffect(() => {
+    if (selectedModelId) {
+      const loadConfig = async () => {
+        try {
+          const res = await axios.get(`http://localhost:3001/api/model-config/${selectedModelId}`);
+          setContextLength(res.data.contextLength || 8192);
+        } catch (err) {
+          console.error("Failed to load model config", err);
+          setContextLength(8192);
+        }
+      };
+      loadConfig();
+    }
+  }, [selectedModelId]);
+
+  // Save config when context length changes
+  useEffect(() => {
+    if (selectedModelId && contextLength) {
+      const saveConfig = async () => {
+        setReloadingModel(true);
+        try {
+          await axios.post('http://localhost:3001/api/model-config', {
+            modelId: selectedModelId,
+            contextLength
+          });
+        } catch (err) {
+          console.error("Failed to save model config", err);
+        } finally {
+          setTimeout(() => setReloadingModel(false), 2000);
+        }
+      };
+      // Debounce the save
+      const timer = setTimeout(saveConfig, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [contextLength, selectedModelId]);
 
   const filteredModels = models.filter(m => 
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -297,11 +336,18 @@ export default function LocalModelsPage() {
                           value={contextLength}
                           onChange={(e) => setContextLength(Number(e.target.value))}
                           className="w-full accent-white"
+                          disabled={reloadingModel}
                         />
                         <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-zinc-600 mt-2">
                           <span>128</span>
                           <span>32K</span>
                         </div>
+                        {reloadingModel && (
+                          <div className="flex items-center justify-center space-x-2 mt-3 text-xs text-zinc-400">
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Reloading model with new context...</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

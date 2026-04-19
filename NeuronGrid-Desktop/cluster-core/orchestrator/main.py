@@ -201,3 +201,72 @@ async def chat_completions(req: ChatCompletionRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+@app.get("/model-info")
+async def get_model_info():
+    """Get model information (context size, etc.) from the active model runner."""
+    current_time = time.time()
+    active_nodes = []
+    
+    for node_id, data in nodes.items():
+        if current_time - data.get("last_seen", 0) < 30 and data.get("status") == "online":
+            active_nodes.append(data)
+            
+    if not active_nodes:
+        return {"n_ctx": 32768, "model": "unknown"}
+    
+    # Get info from the first active node (master)
+    master_node = active_nodes[0]
+    master_ip = master_node.get("ip_address", "localhost")
+    
+    if master_ip == socket.gethostbyname(socket.gethostname()) or len(active_nodes) == 1:
+        master_ip = "localhost"
+    
+    try:
+        response = requests.get(f"http://{master_ip}:8003/model-info", timeout=3)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        logger.warning(f"Failed to get model info: {e}")
+    
+    return {"n_ctx": 32768, "model": "unknown"}
+
+
+@app.post("/reload-model")
+async def reload_model(req: dict):
+    """Force reload the model with new settings (like context length)."""
+    model = req.get("model")
+    context_length = req.get("context_length", 32768)
+    
+    current_time = time.time()
+    active_nodes = []
+    
+    for node_id, data in nodes.items():
+        if current_time - data.get("last_seen", 0) < 30 and data.get("status") == "online":
+            active_nodes.append(data)
+            
+    if not active_nodes:
+        raise HTTPException(status_code=503, detail="No active nodes available")
+    
+    master_node = active_nodes[0]
+    master_ip = master_node.get("ip_address", "localhost")
+    
+    if master_ip == socket.gethostbyname(socket.gethostname()) or len(active_nodes) == 1:
+        master_ip = "localhost"
+    
+    try:
+        # Tell the model runner to reload with new context
+        response = requests.post(
+            f"http://{master_ip}:8003/reload",
+            json={"model": model, "context_length": context_length},
+            timeout=10
+        )
+        if response.status_code == 200:
+            logger.info(f"Model {model} reloaded with context {context_length}")
+            return {"status": "reloaded", "model": model, "context_length": context_length}
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Reload failed")
+    except Exception as e:
+        logger.error(f"Failed to reload model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

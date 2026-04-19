@@ -325,3 +325,110 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("MODEL_RUNNER_PORT", 8003))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+@app.get("/model-info")
+async def get_model_info():
+    """Get information about the currently loaded model."""
+    global master_process, current_model_path
+    
+    if not master_process or master_process.poll() is not None:
+        return {"n_ctx": 32768, "model": "none", "status": "no_model_loaded"}
+    
+    try:
+        # Query llama-server for model info
+        response = requests.get("http://127.0.0.1:8080/props", timeout=2)
+        if response.status_code == 200:
+            props = response.json()
+            return {
+                "n_ctx": props.get("default_generation_settings", {}).get("n_ctx", 32768),
+                "model": os.path.basename(current_model_path) if current_model_path else "unknown",
+                "status": "loaded"
+            }
+    except Exception as e:
+        logger.warning(f"Failed to get model info: {e}")
+    
+    return {"n_ctx": 32768, "model": "unknown", "status": "error"}
+
+
+@app.post("/reload")
+async def reload_model(req: dict):
+    """Reload the model with new settings."""
+    global master_process, current_model_path
+    
+    model = req.get("model")
+    context_length = req.get("context_length", 32768)
+    
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    
+    filepath = os.path.join(MODELS_DIR, model)
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail=f"Model {model} not found")
+    
+    # Kill the existing model server
+    if master_process:
+        logger.info(f"Stopping current model to reload with context {context_length}")
+        try:
+            master_process.terminate()
+            master_process.wait(timeout=5)
+        except:
+            master_process.kill()
+        master_process = None
+        current_model_path = None
+    
+    # Start with new context size
+    _, ext = get_binary_info()
+    server_exe = os.path.join(BIN_DIR, f"llama-server{ext}")
+    
+    if not os.path.exists(server_exe):
+        raise HTTPException(status_code=503, detail="llama-server binary not found")
+    
+    cmd = [
+        server_exe,
+        "-m", filepath,
+        "--port", "8080",
+        "-c", str(context_length),
+        "--host", "127.0.0.1",
+        "-ngl", "999"
+    ]
+    
+    log_file = open("llama_server.log", "w")
+    
+    try:
+        master_process = subprocess.Popen(cmd, stdout=log_file, stderr=log_file)
+    except Exception as e:
+        logger.error(f"Failed to start llama-server: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start AI engine: {str(e)}")
+    
+    current_model_path = filepath
+    
+    logger.info(f"Waiting for model to load with context {context_length}...")
+    
+    # Wait for model to be ready
+    start_time = time.time()
+    is_ready = False
+    while time.time() - start_time < 60:
+        if master_process.poll() is not None:
+            raise HTTPException(status_code=500, detail="AI Engine crashed during reload")
+        
+        try:
+            health_check = requests.get("http://127.0.0.1:8080/health", timeout=1)
+            if health_check.status_code == 200:
+                is_ready = True
+                break
+        except:
+            pass
+        time.sleep(1)
+    
+    if not is_ready:
+        if master_process:
+            try:
+                master_process.terminate()
+            except:
+                pass
+        raise HTTPException(status_code=504, detail="Model reload timed out")
+    
+    logger.info(f"Model reloaded successfully with context {context_length}")
+    return {"status": "reloaded", "model": model, "context_length": context_length}

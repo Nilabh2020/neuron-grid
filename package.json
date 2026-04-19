@@ -1,6 +1,6 @@
 {
   "name": "neurongrid",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "NeuronGrid: Private Local AI Cloud - Distributed AI inference across your devices",
   "main": "cli.js",
   "bin": {
@@ -56,5 +56,8 @@
     "darwin",
     "linux",
     "win32"
-  ]
+  ],
+  "dependencies": {
+    "axios": "^1.15.1"
+  }
 }

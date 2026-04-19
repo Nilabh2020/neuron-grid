@@ -287,16 +287,92 @@ app.delete('/api/chats/:chatId', (req, res) => {
     }
 });
 
+// Get Model Info (context size, etc.)
+app.get('/api/model-info', async (req, res) => {
+    try {
+        const response = await axios.get(`${ORCHESTRATOR_URL}/model-info`, { timeout: 3000 });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Failed to fetch model info:', error.message);
+        res.json({ n_ctx: 32768, model: 'unknown' }); // Default fallback
+    }
+});
+
+// Save Model Config (context size, etc.)
+app.post('/api/model-config', async (req, res) => {
+    console.log('=== MODEL CONFIG SAVE REQUEST ===');
+    console.log('Body:', req.body);
+    
+    try {
+        const { modelId, contextLength } = req.body;
+        
+        if (!modelId || !contextLength) {
+            return res.status(400).json({ error: 'modelId and contextLength are required' });
+        }
+        
+        const configFile = path.join(MODELS_DIR, `${modelId}.config.json`);
+        const config = {
+            modelId,
+            contextLength,
+            updatedAt: Date.now()
+        };
+        
+        fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+        console.log(`Config saved: ${configFile}`);
+        
+        // Tell the orchestrator to reload the model with new context size
+        try {
+            console.log(`Sending reload request for ${modelId} with context ${contextLength}`);
+            const response = await axios.post(`${ORCHESTRATOR_URL}/reload-model`, {
+                model: modelId,
+                context_length: contextLength
+            }, { timeout: 5000 });
+            console.log(`Reload response:`, response.data);
+        } catch (err) {
+            console.log('Reload request failed:', err.message);
+        }
+        
+        res.json({ status: 'saved', config });
+    } catch (error) {
+        console.error('Failed to save model config:', error);
+        res.status(500).json({ error: 'Failed to save config' });
+    }
+});
+
+// Get Model Config
+app.get('/api/model-config/:modelId', (req, res) => {
+    try {
+        const { modelId } = req.params;
+        const configFile = path.join(MODELS_DIR, `${modelId}.config.json`);
+        
+        if (fs.existsSync(configFile)) {
+            const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+            res.json(config);
+        } else {
+            res.json({ contextLength: 8192 }); // Default
+        }
+    } catch (error) {
+        console.error('Failed to load model config:', error);
+        res.json({ contextLength: 8192 }); // Default fallback
+    }
+});
+
 // Proxy Chat Completions with Streaming Support
 app.post('/api/chat', async (req, res) => {
     try {
         const isStream = req.body.stream !== false;
 
         if (isStream) {
+            // Request usage stats from llama.cpp
+            const requestBody = {
+                ...req.body,
+                stream_options: { include_usage: true }
+            };
+
             const response = await axios({
                 method: 'POST',
                 url: `${ORCHESTRATOR_URL}/v1/chat/completions`,
-                data: req.body,
+                data: requestBody,
                 responseType: 'stream'
             });
 
@@ -305,8 +381,88 @@ app.post('/api/chat', async (req, res) => {
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
 
-            // Pipe the AI's thoughts directly to your browser
-            response.data.pipe(res);
+            // Parse and enhance the stream with real metrics
+            let buffer = '';
+            response.data.on('data', (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.trim().startsWith('data: ')) {
+                        const data = line.trim().slice(6);
+                        if (data === '[DONE]') {
+                            res.write(`data: [DONE]\n\n`);
+                            continue;
+                        }
+
+                        try {
+                            const json = JSON.parse(data);
+                            
+                            // Check if this is the final chunk with timings (llama.cpp format)
+                            if (json.timings && json.choices?.[0]?.finish_reason) {
+                                console.log('=== TIMINGS CHUNK RECEIVED ===');
+                                console.log('Timings:', JSON.stringify(json.timings, null, 2));
+                                
+                                const timings = json.timings;
+                                const finishReason = json.choices[0].finish_reason;
+                                
+                                // Extract real metrics from llama.cpp timings
+                                const promptTokens = timings.prompt_n || 0;
+                                const completionTokens = timings.predicted_n || 0;
+                                const totalTokens = promptTokens + completionTokens;
+                                
+                                const promptTime = (timings.prompt_ms || 0) / 1000;
+                                const predictedTime = (timings.predicted_ms || 0) / 1000;
+                                const totalTime = promptTime + predictedTime;
+                                
+                                const tokensPerSec = timings.predicted_per_second || 0;
+                                
+                                // Send enhanced metrics chunk
+                                const metricsChunk = {
+                                    id: json.id,
+                                    object: 'chat.completion.chunk',
+                                    created: json.created,
+                                    model: json.model,
+                                    choices: [],
+                                    usage: {
+                                        prompt_tokens: promptTokens,
+                                        completion_tokens: completionTokens,
+                                        total_tokens: totalTokens
+                                    },
+                                    metrics: {
+                                        tokens_per_sec: parseFloat(tokensPerSec.toFixed(2)),
+                                        prompt_time_sec: parseFloat(promptTime.toFixed(2)),
+                                        generation_time_sec: parseFloat(predictedTime.toFixed(2)),
+                                        total_time_sec: parseFloat(totalTime.toFixed(2)),
+                                        stop_reason: finishReason
+                                    }
+                                };
+                                
+                                console.log('Real metrics extracted:', metricsChunk.metrics);
+                                res.write(`data: ${JSON.stringify(metricsChunk)}\n\n`);
+                            } else {
+                                // CRITICAL: Pass through ALL regular token chunks immediately
+                                res.write(line + '\n');
+                            }
+                        } catch (e) {
+                            // Invalid JSON, pass through as-is
+                            res.write(line + '\n');
+                        }
+                    } else if (line.trim()) {
+                        res.write(line + '\n');
+                    }
+                }
+            });
+
+            response.data.on('end', () => {
+                res.end();
+            });
+
+            response.data.on('error', (err) => {
+                console.error('Stream error:', err);
+                res.end();
+            });
         } else {
             const response = await axios.post(`${ORCHESTRATOR_URL}/v1/chat/completions`, req.body);
             res.json(response.data);

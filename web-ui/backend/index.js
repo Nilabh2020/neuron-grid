@@ -293,10 +293,16 @@ app.post('/api/chat', async (req, res) => {
         const isStream = req.body.stream !== false;
 
         if (isStream) {
+            // Request usage stats from llama.cpp
+            const requestBody = {
+                ...req.body,
+                stream_options: { include_usage: true }
+            };
+
             const response = await axios({
                 method: 'POST',
                 url: `${ORCHESTRATOR_URL}/v1/chat/completions`,
-                data: req.body,
+                data: requestBody,
                 responseType: 'stream'
             });
 
@@ -305,8 +311,114 @@ app.post('/api/chat', async (req, res) => {
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
 
-            // Pipe the AI's thoughts directly to your browser
-            response.data.pipe(res);
+            // Parse and enhance the stream with real metrics
+            let buffer = '';
+            response.data.on('data', (chunk) => {
+                buffer += chunk.toString();
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.trim().startsWith('data: ')) {
+                        const data = line.trim().slice(6);
+                        if (data === '[DONE]') {
+                            res.write(`data: [DONE]\n\n`);
+                            continue;
+                        }
+
+                        try {
+                            const json = JSON.parse(data);
+                            
+                            // If this chunk has usage stats, extract real metrics
+                            if (json.usage) {
+                                const usage = json.usage;
+                                
+                                // Calculate real metrics from llama.cpp
+                                const promptTokens = usage.prompt_tokens || 0;
+                                const completionTokens = usage.completion_tokens || 0;
+                                const totalTokens = usage.total_tokens || 0;
+                                
+                                // llama.cpp can provide timing in multiple formats:
+                                // 1. In usage object as nanoseconds (prompt_eval_time, eval_time)
+                                // 2. In separate timings object as milliseconds (prompt_ms, predicted_ms)
+                                // 3. In usage as milliseconds (prompt_time_ms, completion_time_ms)
+                                
+                                let promptTime = 0;
+                                let predictedTime = 0;
+                                
+                                // Try format 1: nanoseconds in usage
+                                if (usage.prompt_eval_time || usage.eval_time) {
+                                    promptTime = (usage.prompt_eval_time || 0) / 1e9;
+                                    predictedTime = (usage.eval_time || 0) / 1e9;
+                                }
+                                // Try format 2: milliseconds in timings object
+                                else if (json.timings) {
+                                    promptTime = (json.timings.prompt_ms || 0) / 1000;
+                                    predictedTime = (json.timings.predicted_ms || 0) / 1000;
+                                }
+                                // Try format 3: milliseconds in usage
+                                else if (usage.prompt_time_ms || usage.completion_time_ms) {
+                                    promptTime = (usage.prompt_time_ms || 0) / 1000;
+                                    predictedTime = (usage.completion_time_ms || 0) / 1000;
+                                }
+                                // Fallback: estimate from token counts (rough approximation)
+                                else if (completionTokens > 0) {
+                                    // Assume ~50 tok/sec as baseline if no timing data
+                                    predictedTime = completionTokens / 50;
+                                    promptTime = promptTokens / 100; // Prompt processing is usually faster
+                                }
+                                
+                                const totalTime = promptTime + predictedTime;
+                                const tokensPerSec = predictedTime > 0 ? (completionTokens / predictedTime) : 0;
+                                
+                                // Get finish reason from choices if available
+                                const finishReason = json.choices?.[0]?.finish_reason || 'stop';
+                                
+                                // Send enhanced metrics chunk
+                                const metricsChunk = {
+                                    id: json.id,
+                                    object: 'chat.completion.chunk',
+                                    created: json.created,
+                                    model: json.model,
+                                    choices: [],
+                                    usage: {
+                                        prompt_tokens: promptTokens,
+                                        completion_tokens: completionTokens,
+                                        total_tokens: totalTokens
+                                    },
+                                    metrics: {
+                                        tokens_per_sec: parseFloat(tokensPerSec.toFixed(2)),
+                                        prompt_time_sec: parseFloat(promptTime.toFixed(2)),
+                                        generation_time_sec: parseFloat(predictedTime.toFixed(2)),
+                                        total_time_sec: parseFloat(totalTime.toFixed(2)),
+                                        stop_reason: finishReason
+                                    }
+                                };
+                                
+                                console.log('Real metrics extracted:', metricsChunk.metrics);
+                                res.write(`data: ${JSON.stringify(metricsChunk)}\n\n`);
+                            } else {
+                                // Regular token chunk, pass through
+                                res.write(`data: ${data}\n\n`);
+                            }
+                        } catch (e) {
+                            // Invalid JSON, pass through as-is
+                            res.write(line + '\n');
+                        }
+                    } else if (line.trim()) {
+                        res.write(line + '\n');
+                    }
+                }
+            });
+
+            response.data.on('end', () => {
+                res.end();
+            });
+
+            response.data.on('error', (err) => {
+                console.error('Stream error:', err);
+                res.end();
+            });
         } else {
             const response = await axios.post(`${ORCHESTRATOR_URL}/v1/chat/completions`, req.body);
             res.json(response.data);

@@ -216,35 +216,26 @@ export default function ChatPlayground() {
                 try {
                     const json = JSON.parse(data);
                     
-                    // Intercept real engine metrics if the server provides them
-                    if (json.usage || json.timings) {
-                        const engineTokens = json.usage?.completion_tokens || tokenCount;
-                        const totalPromptContextTokens = json.usage?.prompt_tokens || 0;
-                        
-                        if (json.usage?.total_tokens) {
-                            setCurrentContextTokens(json.usage.total_tokens);
-                        }
-
-                        // Some engines provide x_timings or timings block
-                        const engineTimeSec = json.timings?.predicted_ms ? (json.timings.predicted_ms / 1000) : 0;
-                        const finalTime = engineTimeSec > 0 ? engineTimeSec : (Date.now() - generationStartTime) / 1000;
-                        const finalTokPerSec = finalTime > 0 ? (engineTokens / finalTime).toFixed(2) : '0.00';
+                    // Check if this is the metrics chunk with real stats from llama.cpp
+                    if (json.metrics) {
+                        const metrics = json.metrics;
+                        const usage = json.usage || {};
                         
                         setMessages(prev => {
                             const updated = [...prev];
                             const lastMsg = updated[updated.length - 1];
                             if (lastMsg && lastMsg.role === 'assistant') {
                                 lastMsg.stats = {
-                                    ...lastMsg.stats,
-                                    tokPerSec: finalTokPerSec,
-                                    totalTokens: engineTokens,
-                                    totalTime: finalTime.toFixed(2),
-                                    stopReason: 'EOS Token Found'
+                                    tokPerSec: metrics.tokens_per_sec.toFixed(2),
+                                    totalTokens: usage.completion_tokens || tokenCount,
+                                    totalTime: metrics.generation_time_sec.toFixed(2),
+                                    stopReason: metrics.stop_reason === 'stop' ? 'EOS Token Found' : metrics.stop_reason,
+                                    thoughtTime: metrics.prompt_time_sec.toFixed(2)
                                 };
                             }
                             return updated;
                         });
-                        continue; // Skip choice processing for the usage chunk
+                        continue;
                     }
 
                     const token = json.choices?.[0]?.delta?.content || '';
@@ -259,23 +250,13 @@ export default function ChatPlayground() {
                         }
                         assistantContent += token;
                         
-                        const currentTime = Date.now();
-                        const totalTimeSec = generationStartTime ? (currentTime - generationStartTime) / 1000 : 0;
-                        const tokPerSec = totalTimeSec > 0 ? (tokenCount / totalTimeSec).toFixed(2) : '0.00';
-
                         setMessages(prev => {
                             const updated = [...prev];
                             updated[updated.length - 1] = { 
                                 role: 'assistant', 
                                 modelName: model,
                                 content: assistantContent,
-                                stats: {
-                                    tokPerSec: tokPerSec,
-                                    totalTokens: tokenCount,
-                                    totalTime: totalTimeSec.toFixed(2),
-                                    stopReason: 'Streaming...',
-                                    thoughtTime: (timeToFirstToken / 1000).toFixed(2)
-                                }
+                                stats: updated[updated.length - 1].stats || {}
                             };
                             return updated;
                         });
@@ -287,26 +268,7 @@ export default function ChatPlayground() {
         }
       }
       
-      // On complete
-      const endTime = Date.now();
-      const totalTimeSec = generationStartTime ? (endTime - generationStartTime) / 1000 : 0;
-      const tokPerSec = totalTimeSec > 0 ? (tokenCount / totalTimeSec).toFixed(2) : '0.00';
-
-      setMessages(prev => {
-          const updated = [...prev];
-          const lastMsg = updated[updated.length - 1];
-          if (lastMsg && lastMsg.role === 'assistant') {
-              lastMsg.stats = {
-                  tokPerSec: tokPerSec,
-                  totalTokens: tokenCount,
-                  totalTime: totalTimeSec.toFixed(2),
-                  stopReason: 'EOS Token Found',
-                  thoughtTime: (timeToFirstToken / 1000).toFixed(2)
-              };
-          }
-          return updated;
-      });
-
+      // Stream complete - metrics already set by backend
     } catch (err) {
       setLoading(false);
       setMessages(prev => [...prev, { 
@@ -433,27 +395,22 @@ export default function ChatPlayground() {
 
                     {/* Stats Pills Row */}
                     {msg.stats && msg.stats.tokPerSec && (
-                      <div className="flex flex-col gap-2 pt-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                           <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
-                              <Lightbulb size={12} />
-                              <span>~{msg.stats.tokPerSec} tok/sec</span>
-                           </div>
-                           <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
-                              <Layers size={12} />
-                              <span>{msg.stats.totalTokens} tokens</span>
-                           </div>
-                           <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
-                              <Clock size={12} />
-                              <span>~{msg.stats.totalTime}s</span>
-                           </div>
-                           <div className="bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
-                              <span>Stop: {msg.stats.stopReason}</span>
-                           </div>
-                        </div>
-                        <div className="text-[10px] text-zinc-600 italic">
-                          Note: Metrics are approximate (based on streaming speed, includes network latency)
-                        </div>
+                      <div className="flex flex-wrap items-center gap-2 pt-3">
+                         <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
+                            <Lightbulb size={12} />
+                            <span>{msg.stats.tokPerSec} tok/sec</span>
+                         </div>
+                         <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
+                            <Layers size={12} />
+                            <span>{msg.stats.totalTokens} tokens</span>
+                         </div>
+                         <div className="flex items-center space-x-1.5 bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
+                            <Clock size={12} />
+                            <span>{msg.stats.totalTime}s</span>
+                         </div>
+                         <div className="bg-[#1a1a1a] px-2.5 py-1 rounded-md text-[12px] text-zinc-400 font-medium border border-zinc-800/30">
+                            <span>Stop: {msg.stats.stopReason}</span>
+                         </div>
                       </div>
                     )}
 
