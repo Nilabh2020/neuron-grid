@@ -12,6 +12,7 @@ build/
 *.zip
 NeuronGrid-Worker-Package/
 worker-package.zip
+NeuronGrid-v*.zip
 
 # Logs
 *.log
