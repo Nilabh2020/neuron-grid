@@ -73,18 +73,31 @@ if (command === 'start') {
 
     const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
 
+    // Build frontend if not already built
+    const nextBuildDir = path.join(frontDir, '.next');
+    if (!fs.existsSync(nextBuildDir)) {
+        console.log('[Web-Frontend] Building production bundle...');
+        try {
+            execSync('npm run build', { stdio: 'inherit', cwd: frontDir });
+        } catch (e) {
+            console.error('[Web-Frontend] Build failed');
+        }
+    }
+
     // Start background processes
     runCmd('Orchestrator', `${pythonCmd} main.py`, orchDir);
     runCmd('Model-Manager', `${pythonCmd} main.py`, mmDir);
     runCmd('Device-Service', `${pythonCmd} main.py`, devDir);
     runCmd('Model-Runner', `${pythonCmd} main.py`, runDir);
     
-    // Give backend a moment to start before frontend/electron
+    // Start backend API and frontend
     setTimeout(() => {
-        runCmd('Web-Frontend', `npm run dev`, frontDir);
-        runCmd('Web-Backend', `npm start`, backDir);
-    }, 2000);
+        runCmd('Web-Backend', `node index.js`, backDir);
+        runCmd('Web-Frontend', `npx next start`, frontDir);
+    }, 3000);
 
+    console.log('\n✅ NeuronGrid is starting...');
+    console.log('📡 Access UI at: http://localhost:3000\n');
 } else if (command === 'node') {
     console.log("🚀 Starting NeuronGrid Worker Node (Auto-discovers any Master on LAN)...");
     
@@ -124,6 +137,17 @@ if (command === 'start') {
 
     const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
 
+    // Build frontend if not already built
+    const nextBuildDir = path.join(frontDir, '.next');
+    if (!fs.existsSync(nextBuildDir)) {
+        console.log('[Web-Frontend] Building production bundle...');
+        try {
+            execSync('npm run build', { stdio: 'inherit', cwd: frontDir });
+        } catch (e) {
+            console.error('[Web-Frontend] Build failed');
+        }
+    }
+
     // Start all services
     runCmd('Orchestrator', `${pythonCmd} main.py`, orchDir);
     runCmd('Model-Manager', `${pythonCmd} main.py`, mmDir);
@@ -131,9 +155,12 @@ if (command === 'start') {
     runCmd('Model-Runner', `${pythonCmd} main.py`, runDir);
     
     setTimeout(() => {
-        runCmd('Web-Frontend', `npm run dev`, frontDir);
-        runCmd('Web-Backend', `npm start`, backDir);
-    }, 2000);
+        runCmd('Web-Backend', `node index.js`, backDir);
+        runCmd('Web-Frontend', `npx next start`, frontDir);
+    }, 3000);
+
+    console.log('\n✅ NeuronGrid is starting...');
+    console.log('📡 Access UI at: http://localhost:3000\n');
 } else {
     console.log(`
 🧠 NeuronGrid CLI

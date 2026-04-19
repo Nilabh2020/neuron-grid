@@ -150,7 +150,14 @@ export default function ChatPlayground() {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to reach cluster');
+      if (!response.ok) {
+        setLoading(false);
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: '⚠️ **Connection Error**\n\nCould not reach the AI cluster. Please check:\n- Orchestrator is running (port 8000)\n- Model runner is active\n- Model is loaded' 
+        }]);
+        return;
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -189,16 +196,17 @@ export default function ChatPlayground() {
                         });
                     }
                 } catch (e) {
-                    // Ignore
+                    // Ignore incomplete JSON
                 }
             }
         }
       }
     } catch (err) {
-      console.error("Chat error", err);
-      setMessages(prev => [...prev, { role: 'assistant', content: "❌ Error: Failed to reach cluster or model timeout." }]);
-    } finally {
       setLoading(false);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: '❌ **Error**\n\nFailed to connect to the cluster. Make sure all services are running:\n```\nneurongrid start\n```' 
+      }]);
     }
   };
 
