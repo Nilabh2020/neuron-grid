@@ -1,41 +1,59 @@
 {
-  "name": "@Nilabh/neuron-grid",
+  "name": "neurongrid",
   "version": "1.0.0",
-  "description": "NeuronGrid: Private Local AI Cloud for the Modern Enterprise",
+  "description": "NeuronGrid: Private Local AI Cloud - Distributed AI inference across your devices",
   "main": "cli.js",
   "bin": {
-    "NeuronGrid": "./cli.js"
-  },
-  "publishConfig": {
-    "access": "public"
+    "neurongrid": "cli.js"
   },
   "scripts": {
-    "start": "node ./cli.js start",
-    "build": "pkg . --targets node18-win-x64 --output NeuronGrid.exe"
-  },
-  "pkg": {
-    "assets": [
-      "cluster-core/**/*",
-      "node-agent/**/*",
-      "web-ui/**/*"
-    ],
-    "outputPath": "."
+    "start": "node cli.js start"
   },
   "files": [
     "cli.js",
-    "cluster-core/**/*",
-    "node-agent/**/*",
-    "web-ui/backend/**/*",
-    "web-ui/frontend/**/*",
-    "README.md"
+    "cluster-core/**/*.py",
+    "cluster-core/**/*.txt",
+    "cluster-core/**/*.md",
+    "cluster-core/**/*.example",
+    "node-agent/**/*.py",
+    "node-agent/**/*.txt",
+    "node-agent/**/*.md",
+    "node-agent/**/*.example",
+    "node-agent/model-runner/models/.gitkeep",
+    "web-ui/backend/*.js",
+    "web-ui/backend/package.json",
+    "web-ui/frontend/src/**/*",
+    "web-ui/frontend/public/**/*",
+    "web-ui/frontend/*.json",
+    "web-ui/frontend/*.js",
+    "web-ui/frontend/*.mjs",
+    "web-ui/frontend/*.ts",
+    "web-ui/frontend/*.css",
+    "README.md",
+    "LICENSE.txt"
   ],
   "keywords": [
     "ai",
     "llm",
     "cluster",
     "private-ai",
-    "distributed-computing"
+    "distributed-computing",
+    "local-ai",
+    "neural-network",
+    "machine-learning"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nilabh/neuron-grid.git"
+  },
   "author": "Nilabh",
-  "license": "Commercial"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ]
 }

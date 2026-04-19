@@ -1,10 +1,62 @@
+# Development files
 node_modules/
-.next/
-out/
-build/
+.git/
+.gitignore
+.vscode/
+
+# Build artifacts
 dist/
-venv/
-.env
+*.log
+*.exe
+*.dmg
+*.AppImage
+*.deb
+
+# Electron stuff
+electron/
+NeuronGrid-Desktop/
+
+# Test files
+test/
+*.test.js
+
+# Documentation (keep only README.md)
+docs/
+*.md
+!README.md
+
+# Batch files
+*.bat
+
+# Release files
+NeuronGrid-Release/
+Formula/
+
+# Cache and build files
+.next/
 __pycache__/
 *.pyc
-*.sqlite3
+.DS_Store
+
+# Exclude frontend node_modules and build
+web-ui/frontend/node_modules/
+web-ui/frontend/.next/
+web-ui/frontend/package-lock.json
+
+# Exclude backend node_modules
+web-ui/backend/node_modules/
+web-ui/backend/package-lock.json
+
+# Exclude model files (users download their own)
+node-agent/model-runner/models/*
+!node-agent/model-runner/models/.gitkeep
+node-agent/model-runner/bin/
+node-agent/model-runner/*.log
+node-agent/model-runner/*.zip
+
+# Exclude large binaries
+*.bin
+*.gguf
+*.safetensors
+*.pth
+*.pt

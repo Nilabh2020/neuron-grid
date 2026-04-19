@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+requests
+huggingface_hub
+tqdm
+python-dotenv

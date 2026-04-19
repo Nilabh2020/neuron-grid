@@ -1,0 +1,75 @@
+{
+  "name": "neurongrid-desktop",
+  "version": "1.0.0",
+  "description": "NeuronGrid Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64 --dir",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --mac --linux",
+    "test": "node test-setup.js"
+  },
+  "author": "Nilabh",
+  "license": "Commercial",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.neurongrid.app",
+    "productName": "NeuronGrid",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "cluster-core",
+        "to": "cluster-core",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "node-agent",
+        "to": "node-agent",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "web-ui",
+        "to": "web-ui",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NeuronGrid",
+      "license": "LICENSE.txt"
+    },
+    "dmg": {
+      "title": "NeuronGrid",
+      "icon": "build/icon.icns"
+    }
+  }
+}
