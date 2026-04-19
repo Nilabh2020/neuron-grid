@@ -83,7 +83,8 @@ export default function ChatPlayground() {
         title
       });
       
-      loadChatsFromBackend();
+      // Trigger sidebar refresh immediately
+      window.dispatchEvent(new CustomEvent('chats_updated'));
       window.dispatchEvent(new CustomEvent('chat_active', { detail: chatId }));
       
       // Only generate title for the first user message
@@ -110,10 +111,8 @@ export default function ChatPlayground() {
         title
       });
       
-      // Force sidebar refresh
-      setTimeout(() => {
-        loadChatsFromBackend();
-      }, 500);
+      // Force sidebar refresh with updated title
+      window.dispatchEvent(new CustomEvent('chats_updated'));
     } catch (err) {
       console.error("Title generation failed", err);
     }
