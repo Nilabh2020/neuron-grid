@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, HardDrive, Database, MessageSquare, Settings, Plus, MessageCircle, Trash2 } from 'lucide-react';
+import { LayoutDashboard, HardDrive, Database, MessageSquare, Settings, Plus, MessageCircle, Trash2, Network } from 'lucide-react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 
@@ -75,7 +75,9 @@ export default function Sidebar() {
       className="w-64 border-r border-zinc-800 flex flex-col p-6 space-y-8 bg-zinc-950/50 backdrop-blur-xl shrink-0"
     >
       <div className="flex items-center space-x-3 px-2">
-        <img src="/logo.png" alt="NeuronGrid" className="w-8 h-8 rounded-lg" />
+        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black">
+          <Network size={20} />
+        </div>
         <h1 className="text-xl font-bold tracking-tight text-white">NeuronGrid</h1>
       </div>
 
@@ -138,39 +140,45 @@ export default function Sidebar() {
                           key={chat.id} 
                           onClick={() => handleLoadChat(chat.id)}
                           style={{ 
-                            backgroundColor: isActive ? '#ffffff' : '#27272a', 
-                            color: isActive ? '#000000' : '#ffffff', 
+                            backgroundColor: isActive ? '#ffffff' : 'transparent', 
+                            color: isActive ? '#000000' : '#a1a1aa', 
                             border: '1px solid', 
-                            borderColor: isActive ? '#ffffff' : '#3f3f46',
-                            padding: '8px 10px',
-                            borderRadius: '10px',
+                            borderColor: isActive ? '#ffffff' : '#18181b',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '8px',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            marginBottom: '4px'
                           }}
                           onMouseEnter={(e) => {
                             if (!isActive) {
-                              e.currentTarget.style.backgroundColor = '#3f3f46';
+                              e.currentTarget.style.backgroundColor = '#18181b';
+                              e.currentTarget.style.borderColor = '#27272a';
+                              e.currentTarget.style.color = '#ffffff';
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (!isActive) {
-                              e.currentTarget.style.backgroundColor = '#27272a';
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.borderColor = '#18181b';
+                              e.currentTarget.style.color = '#a1a1aa';
                             }
                           }}
                       >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                              <MessageCircle size={14} style={{ flexShrink: 0 }} />
+                              <MessageCircle size={14} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.5 }} />
                               <span style={{ 
-                                fontSize: '13px', 
-                                fontWeight: 500, 
+                                fontSize: '12px', 
+                                fontWeight: isActive ? 700 : 500, 
                                 overflow: 'hidden', 
                                 textOverflow: 'ellipsis', 
                                 whiteSpace: 'nowrap',
-                                lineHeight: '1.4'
+                                lineHeight: '1.4',
+                                letterSpacing: '-0.01em'
                               }}>{chat.title}</span>
                           </div>
                           <button
@@ -185,19 +193,20 @@ export default function Sidebar() {
                                 border: 'none',
                                 background: 'transparent',
                                 cursor: 'pointer',
-                                color: isActive ? '#71717a' : '#52525b'
+                                color: isActive ? '#71717a' : '#3f3f46',
+                                transition: 'all 0.2s'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                                e.currentTarget.style.backgroundColor = isActive ? 'rgba(0,0,0,0.05)' : '#27272a';
                                 e.currentTarget.style.color = '#ef4444';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.color = isActive ? '#71717a' : '#52525b';
+                                e.currentTarget.style.color = isActive ? '#71717a' : '#3f3f46';
                               }}
                               title="Delete chat"
                           >
-                              <Trash2 size={14} />
+                              <Trash2 size={12} />
                           </button>
                       </div>
                     );

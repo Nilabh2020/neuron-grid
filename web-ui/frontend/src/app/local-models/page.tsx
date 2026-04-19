@@ -167,8 +167,8 @@ export default function LocalModelsPage() {
                         <span className={`text-sm font-black truncate ${isSelected ? 'text-white' : 'text-zinc-300'}`} title={model.name}>{model.name}</span>
                         <div className="flex items-center space-x-1 shrink-0">
                           {model.capabilities.includes('vision') && <div className="border border-zinc-800 text-yellow-600 rounded px-1 py-0.5"><Eye size={10} /></div>}
-                          {model.capabilities.includes('tool') && <div className="border border-zinc-800 text-blue-600 rounded px-1 py-0.5"><Wrench size={10} /></div>}
-                          {model.capabilities.includes('text') && <div className="border border-zinc-800 text-green-600 rounded px-1 py-0.5"><Info size={10} /></div>}
+                          {model.capabilities.includes('tool') && <div className="border border-zinc-800 text-zinc-400 rounded px-1 py-0.5"><Wrench size={10} /></div>}
+                          {model.capabilities.includes('text') && <div className="border border-zinc-800 text-zinc-400 rounded px-1 py-0.5"><Info size={10} /></div>}
                         </div>
                       </div>
                       <div>

@@ -74,8 +74,8 @@ export default function Dashboard() {
             <div className="text-right">
               <div className="text-[10px] text-zinc-600 font-black uppercase tracking-widest mb-1 italic">License Status</div>
               <div className="text-white font-black text-sm flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span>PROFESSIONAL (V1.0)</span>
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.5)]"></span>
+                <span className="tracking-tighter uppercase italic">PROFESSIONAL (V1.0)</span>
               </div>
             </div>
             <div className="h-10 w-px bg-zinc-900"></div>

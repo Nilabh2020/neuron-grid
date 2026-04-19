@@ -239,7 +239,7 @@ async def create_completion(req: Request):
             server_exe,
             "-m", filepath,
             "--port", "8080",
-            "-c", "2048",
+            "-c", "32768",
             "--host", "127.0.0.1",
             "-ngl", "999"  # Offload all layers to GPU if available
         ]
@@ -304,12 +304,18 @@ async def create_completion(req: Request):
             "temperature": body.get("temperature", 0.7),
             "stream": body.get("stream", False)
         }
-        
-        logger.info("Proxying request to internal llama-server on port 8080")
-        
+
+        if openai_req["stream"]:
+            openai_req["stream_options"] = {"include_usage": True}
+
+        logger.info("Proxying request to internal llama-server on port 8080")        
         if openai_req["stream"]:
             response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, stream=True, timeout=120)
-            return StreamingResponse(response.iter_content(chunk_size=None), media_type="text/event-stream")
+            def stream_gen():
+                for chunk in response.iter_content(chunk_size=None):
+                    if chunk:
+                        yield chunk
+            return StreamingResponse(stream_gen(), media_type="text/event-stream")
         else:
             response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, timeout=120)
             return response.json()
@@ -320,6 +326,21 @@ async def create_completion(req: Request):
     except Exception as e:
         logger.error(f"Failed to proxy to Master Server: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/model-info")
+async def get_model_info():
+    """Fetch the real hardware configuration and context size from the active llama-server."""
+    try:
+        res = requests.get("http://127.0.0.1:8080/props", timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            return {
+                "n_ctx": data.get("default_generation_settings", {}).get("n_ctx", 32768),
+                "model": data.get("default_generation_settings", {}).get("model", "unknown")
+            }
+    except:
+        pass
+    return {"n_ctx": 32768, "model": current_model_path}
 
 if __name__ == "__main__":
     import uvicorn

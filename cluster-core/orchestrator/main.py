@@ -182,7 +182,11 @@ async def chat_completions(req: ChatCompletionRequest):
             if response.status_code != 200:
                 raise HTTPException(status_code=response.status_code, detail="Stream failed")
             from fastapi.responses import StreamingResponse
-            return StreamingResponse(response.iter_content(chunk_size=None), media_type="text/event-stream")
+            def stream_gen():
+                for line in response.iter_lines():
+                    if line:
+                        yield line + b'\n\n'
+            return StreamingResponse(stream_gen(), media_type="text/event-stream")
         else:
             response = requests.post(master_url, json=runner_req, timeout=60)
             if response.status_code != 200:
@@ -190,13 +194,36 @@ async def chat_completions(req: ChatCompletionRequest):
                 logger.error(f"Runner returned error {response.status_code}: {error_detail}")
                 raise HTTPException(status_code=response.status_code, detail=error_detail)
             return response.json()
-            
+
     except requests.exceptions.ConnectionError:
         logger.error(f"Could not connect to Model Runner at {master_url}")
         raise HTTPException(status_code=503, detail=f"Model Runner at {master_ip}:8003 is unreachable")
     except Exception as e:
         logger.error(f"Routing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/model-info")
+async def get_model_info():
+    """Proxy the model-info endpoint from the active master node."""
+    active_nodes = []
+    current_time = time.time()
+    for node_id, data in nodes.items():
+        if current_time - data.get("last_seen", 0) < 30 and data.get("status") == "online":
+            active_nodes.append(data)
+
+    if not active_nodes:
+        return {"n_ctx": 32768}
+
+    master_node = max(active_nodes, key=lambda x: x.get("compute_score", 0))
+    master_ip = master_node.get("ip_address", "localhost")
+    if master_ip == socket.gethostbyname(socket.gethostname()) or len(active_nodes) == 1:
+        master_ip = "localhost"
+
+    try:
+        res = requests.get(f"http://{master_ip}:8003/model-info", timeout=3)
+        return res.json()
+    except:
+        return {"n_ctx": 32768}
 
 if __name__ == "__main__":
     import uvicorn
