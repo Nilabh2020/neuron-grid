@@ -69,8 +69,8 @@ export default function Sidebar() {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="w-64 border-r border-zinc-800 flex flex-col p-6 space-y-8 bg-zinc-950/50 backdrop-blur-xl shrink-0"
     >
-      <div className="flex items-center space-x-2 px-2">
-        <div className="w-8 h-8 bg-gradient-to-tr from-zinc-400 to-zinc-700 rounded-lg shadow-lg shadow-white/10" />
+      <div className="flex items-center space-x-3 px-2">
+        <img src="/logo.png" alt="NeuronGrid" className="w-8 h-8 rounded-lg" />
         <h1 className="text-xl font-bold tracking-tight text-white">NeuronGrid</h1>
       </div>
 

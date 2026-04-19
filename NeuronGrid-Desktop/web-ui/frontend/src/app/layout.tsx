@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "NeuronGrid Dashboard",
   description: "Private Local AI Cloud Management",
+  icons: {
+    icon: '/logo.png',
+  },
 };
 
 export default function RootLayout({

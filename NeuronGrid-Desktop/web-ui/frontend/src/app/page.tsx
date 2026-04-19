@@ -60,9 +60,7 @@ export default function Dashboard() {
         {/* Top Product Bar */}
         <div className="flex justify-between items-center border-b border-zinc-900 pb-8">
           <div className="flex items-center space-x-6">
-            <div className="bg-white text-black p-3 rounded-xl">
-              <ShieldCheck size={32} strokeWidth={2.5} />
-            </div>
+            <img src="/logo.png" alt="NeuronGrid" className="w-16 h-16 rounded-xl shadow-lg" />
             <div>
               <div className="flex items-center space-x-3">
                 <h1 className="text-3xl font-black tracking-tighter uppercase italic">NeuronGrid</h1>
