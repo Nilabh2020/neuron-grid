@@ -22,6 +22,7 @@
     "node-agent/model-runner/models/.gitkeep",
     "web-ui/backend/*.js",
     "web-ui/backend/package.json",
+    "web-ui/frontend/.next/**/*",
     "web-ui/frontend/src/**/*",
     "web-ui/frontend/public/**/*",
     "web-ui/frontend/*.json",
