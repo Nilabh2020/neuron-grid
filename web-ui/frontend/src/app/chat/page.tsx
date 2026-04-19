@@ -58,12 +58,12 @@ export default function ChatPlayground() {
       
       const chatMeta = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
       if (!chatMeta.find((c: any) => c.id === chatId)) {
-        const title = "New Conversation";
+        const userMsg = messages.find(m => m.role === 'user');
+        const title = userMsg ? userMsg.content.slice(0, 25) + (userMsg.content.length > 25 ? '...' : '') : "New Conversation";
         chatMeta.unshift({ id: chatId, title });
         localStorage.setItem('neuron_chats', JSON.stringify(chatMeta));
         window.dispatchEvent(new Event('chats_updated'));
         
-        const userMsg = messages.find(m => m.role === 'user');
         if (userMsg) {
           generateChatTitle(chatId, userMsg.content);
         }
@@ -118,7 +118,7 @@ export default function ChatPlayground() {
     setTelemetry("Initializing neural link...");
 
     try {
-      const systemPrompt = { role: 'system', content: 'You are Neuron, a brilliant, direct, and concise AI running locally on an enterprise cluster. Answer the user\'s prompt immediately without any conversational filler. NEVER use greetings like "Hello" or "I am doing well". NEVER give robotic disclaimers. Go straight to the answer.' };
+      const systemPrompt = { role: 'system', content: 'You are Neuron, a helpful and highly capable AI running locally on a private enterprise cluster. Be conversational, direct, and concise. Never use generic robotic disclaimers.' };
       const apiMessages = [systemPrompt, ...newMessages];
 
       const response = await fetch('http://localhost:3001/api/chat', {

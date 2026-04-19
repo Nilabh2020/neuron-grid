@@ -31,7 +31,7 @@ export default function Dashboard() {
     : stats?.nodes || [];
 
   if (loading) return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-6">
+    <div className="min-h-full bg-black flex flex-col items-center justify-center space-y-6">
       <div className="w-16 h-16 border-4 border-t-white border-zinc-800 rounded-full animate-spin"></div>
       <div className="text-zinc-500 font-bold tracking-[0.3em] uppercase text-xs animate-pulse">
         NeuronGrid Engine Initializing...
@@ -40,7 +40,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black">
+    <div className="min-h-full bg-[#050505] text-white selection:bg-white selection:text-black">
       <div className="max-w-[1600px] mx-auto px-8 py-12 space-y-12">
         
         {/* Top Product Bar */}
