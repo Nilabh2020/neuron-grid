@@ -38,10 +38,8 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Exclude frontend node_modules and build
+# Exclude frontend node_modules
 web-ui/frontend/node_modules/
-web-ui/frontend/.next/
-web-ui/frontend/package-lock.json
 
 # Exclude backend node_modules
 web-ui/backend/node_modules/
