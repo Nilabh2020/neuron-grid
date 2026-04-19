@@ -12,10 +12,14 @@ const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || 'http://localhost:8000'
 const MODEL_MANAGER_URL = process.env.MODEL_MANAGER_URL || 'http://localhost:8002';
 
 const MODELS_DIR = path.join(os.homedir(), '.neurongrid', 'models');
+const CHATS_DIR = path.join(os.homedir(), '.neurongrid', 'chats');
 
-// Ensure models directory exists
+// Ensure models and chats directories exist
 if (!fs.existsSync(MODELS_DIR)) {
     fs.mkdirSync(MODELS_DIR, { recursive: true });
+}
+if (!fs.existsSync(CHATS_DIR)) {
+    fs.mkdirSync(CHATS_DIR, { recursive: true });
 }
 
 app.use(cors());
@@ -197,6 +201,90 @@ app.post('/api/models/download', async (req, res) => {
 // Check Download Status
 app.get('/api/models/downloads', (req, res) => {
     res.json(activeDownloads);
+});
+
+// Save Chat
+app.post('/api/chats/save', (req, res) => {
+    try {
+        const { chatId, messages, title } = req.body;
+        
+        if (!chatId || !messages) {
+            return res.status(400).json({ error: 'chatId and messages are required' });
+        }
+
+        const chatFile = path.join(CHATS_DIR, `${chatId}.json`);
+        const chatData = {
+            id: chatId,
+            title: title || 'New Conversation',
+            messages: messages,
+            updatedAt: Date.now()
+        };
+
+        fs.writeFileSync(chatFile, JSON.stringify(chatData, null, 2));
+        res.json({ status: 'saved', chatId });
+    } catch (error) {
+        console.error('Failed to save chat:', error);
+        res.status(500).json({ error: 'Failed to save chat' });
+    }
+});
+
+// Get All Chats
+app.get('/api/chats', (req, res) => {
+    try {
+        const files = fs.readdirSync(CHATS_DIR);
+        const chats = files
+            .filter(f => f.endsWith('.json'))
+            .map(filename => {
+                const filePath = path.join(CHATS_DIR, filename);
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                return {
+                    id: data.id,
+                    title: data.title,
+                    updatedAt: data.updatedAt
+                };
+            })
+            .sort((a, b) => b.updatedAt - a.updatedAt);
+
+        res.json(chats);
+    } catch (error) {
+        console.error('Failed to load chats:', error);
+        res.json([]);
+    }
+});
+
+// Get Single Chat
+app.get('/api/chats/:chatId', (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const chatFile = path.join(CHATS_DIR, `${chatId}.json`);
+        
+        if (!fs.existsSync(chatFile)) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        const data = JSON.parse(fs.readFileSync(chatFile, 'utf8'));
+        res.json(data);
+    } catch (error) {
+        console.error('Failed to load chat:', error);
+        res.status(500).json({ error: 'Failed to load chat' });
+    }
+});
+
+// Delete Chat
+app.delete('/api/chats/:chatId', (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const chatFile = path.join(CHATS_DIR, `${chatId}.json`);
+        
+        if (fs.existsSync(chatFile)) {
+            fs.unlinkSync(chatFile);
+        }
+
+        res.json({ status: 'deleted', chatId });
+    } catch (error) {
+        console.error('Failed to delete chat:', error);
+        res.status(500).json({ error: 'Failed to delete chat' });
+    }
 });
 
 // Proxy Chat Completions with Streaming Support

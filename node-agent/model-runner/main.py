@@ -9,6 +9,8 @@ import zipfile
 import threading
 import platform
 import stat
+import signal
+import atexit
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -35,6 +37,42 @@ os.makedirs(BIN_DIR, exist_ok=True)
 rpc_process = None
 master_process = None
 current_model_path = None
+
+# Cleanup function
+def cleanup_processes():
+    global rpc_process, master_process
+    logger.info("Cleaning up processes...")
+    
+    if master_process:
+        try:
+            master_process.terminate()
+            master_process.wait(timeout=3)
+        except:
+            try:
+                master_process.kill()
+            except:
+                pass
+    
+    if rpc_process:
+        try:
+            rpc_process.terminate()
+            rpc_process.wait(timeout=3)
+        except:
+            try:
+                rpc_process.kill()
+            except:
+                pass
+
+# Register cleanup
+atexit.register(cleanup_processes)
+
+def signal_handler(signum, frame):
+    logger.info(f"Received signal {signum}, shutting down...")
+    cleanup_processes()
+    exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 def get_binary_info():
     """Detects the current OS and CPU architecture to fetch the correct llama.cpp binary."""
@@ -164,9 +202,17 @@ async def create_completion(req: Request):
     """Act as the Master Node: Launch llama-server with RPC and proxy the request."""
     global master_process
     global current_model_path
-    body = await req.json()
+    
+    try:
+        body = await req.json()
+    except Exception as e:
+        logger.error(f"Failed to parse request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
     
     filename = body.get("model_name")
+    if not filename:
+        raise HTTPException(status_code=400, detail="model_name is required")
+        
     rpc_servers = body.get("rpc_servers", "")
     filepath = os.path.join(MODELS_DIR, filename)
     
@@ -176,10 +222,16 @@ async def create_completion(req: Request):
     _, ext = get_binary_info()
     server_exe = os.path.join(BIN_DIR, f"llama-server{ext}")
     
+    if not os.path.exists(server_exe):
+        raise HTTPException(status_code=503, detail="llama-server binary not found. Please wait for download to complete.")
+    
     if master_process and current_model_path != filepath:
         logger.info(f"Switching models from {current_model_path} to {filepath}")
-        master_process.terminate()
-        master_process.wait()
+        try:
+            master_process.terminate()
+            master_process.wait(timeout=5)
+        except:
+            master_process.kill()
         master_process = None
         
     if not master_process or master_process.poll() is not None:
@@ -188,7 +240,8 @@ async def create_completion(req: Request):
             "-m", filepath,
             "--port", "8080",
             "-c", "2048",
-            "--host", "127.0.0.1"
+            "--host", "127.0.0.1",
+            "-ngl", "999"  # Offload all layers to GPU if available
         ]
         
         if rpc_servers:
@@ -198,7 +251,13 @@ async def create_completion(req: Request):
             logger.info("Master Node: Running locally (No RPC workers provided)")
             
         log_file = open("llama_server.log", "w")
-        master_process = subprocess.Popen(cmd, stdout=log_file, stderr=log_file)
+        
+        try:
+            master_process = subprocess.Popen(cmd, stdout=log_file, stderr=log_file)
+        except Exception as e:
+            logger.error(f"Failed to start llama-server: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to start AI engine: {str(e)}")
+            
         current_model_path = filepath
         
         logger.info("Waiting for llama-server to initialize model weights (polling health)...")
@@ -231,6 +290,11 @@ async def create_completion(req: Request):
             
         if not is_ready:
             logger.error("llama-server failed to start within 60 seconds")
+            if master_process:
+                try:
+                    master_process.terminate()
+                except:
+                    pass
             raise HTTPException(status_code=504, detail="AI engine timed out while loading weights.")
 
     try:
@@ -244,12 +308,15 @@ async def create_completion(req: Request):
         logger.info("Proxying request to internal llama-server on port 8080")
         
         if openai_req["stream"]:
-            response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, stream=True)
+            response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, stream=True, timeout=120)
             return StreamingResponse(response.iter_content(chunk_size=None), media_type="text/event-stream")
         else:
-            response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req)
+            response = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=openai_req, timeout=120)
             return response.json()
             
+    except requests.exceptions.Timeout:
+        logger.error("Request to llama-server timed out")
+        raise HTTPException(status_code=504, detail="AI inference timed out")
     except Exception as e:
         logger.error(f"Failed to proxy to Master Server: {e}")
         raise HTTPException(status_code=500, detail=str(e))

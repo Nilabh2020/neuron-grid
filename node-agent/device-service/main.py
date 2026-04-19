@@ -128,14 +128,28 @@ def listen_for_orchestrator():
     udp_socket.bind(('', 8888))
     
     logger.info("Listening for Orchestrator broadcast on UDP 8888...")
+    logger.info("PEER MODE: Will connect to first available orchestrator")
+    
     while True:
         try:
             data, addr = udp_socket.recvfrom(1024)
             msg = data.decode('utf-8')
             if msg.startswith("NEURON_ORCHESTRATOR:"):
                 discovered_url = msg.split("NEURON_ORCHESTRATOR:")[1]
-                if ORCHESTRATOR_URL != discovered_url:
-                    logger.info(f"Discovered Orchestrator at {discovered_url}")
+                
+                # In peer mode, prefer localhost orchestrator if available
+                local_ip = socket.gethostbyname(socket.gethostname())
+                discovered_ip = discovered_url.split("//")[1].split(":")[0]
+                
+                # If we discover our own orchestrator, use it
+                if discovered_ip == local_ip or discovered_ip == "127.0.0.1":
+                    if ORCHESTRATOR_URL != "http://localhost:8000":
+                        logger.info(f"Found local orchestrator, using: http://localhost:8000")
+                        ORCHESTRATOR_URL = "http://localhost:8000"
+                        register_with_orchestrator()
+                # Otherwise, use the first remote orchestrator we find
+                elif ORCHESTRATOR_URL != discovered_url:
+                    logger.info(f"Discovered remote orchestrator at {discovered_url}")
                     ORCHESTRATOR_URL = discovered_url
                     register_with_orchestrator()
         except Exception as e:

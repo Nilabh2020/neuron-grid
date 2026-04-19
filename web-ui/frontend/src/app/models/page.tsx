@@ -137,7 +137,7 @@ export default function ModelsPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex bg-black text-white font-sans overflow-hidden border-t border-zinc-900 selection:bg-white selection:text-black">
+    <div className="h-screen flex bg-black text-white font-sans overflow-hidden border-t border-zinc-900 selection:bg-white selection:text-black">
       
       {/* Left Sidebar - Model List */}
       <div className="w-[450px] flex flex-col border-r border-zinc-900 bg-black shrink-0">

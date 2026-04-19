@@ -66,7 +66,7 @@ export default function LocalModelsPage() {
   };
 
   return (
-    <div className="h-[calc(100vh)] flex flex-col bg-black text-white font-sans overflow-hidden selection:bg-white selection:text-black">
+    <div className="h-screen flex flex-col bg-black text-white font-sans overflow-hidden selection:bg-white selection:text-black">
       
       {/* Top Header */}
       <div className="h-14 border-b border-zinc-900 flex items-center justify-between px-6 shrink-0 bg-black">

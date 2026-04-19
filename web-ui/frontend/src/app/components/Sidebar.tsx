@@ -3,33 +3,63 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, HardDrive, Database, MessageSquare, Settings, Plus, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, HardDrive, Database, MessageSquare, Settings, Plus, MessageCircle, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [chats, setChats] = useState<{id: string, title: string}[]>([]);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
 
-  const loadChats = () => {
-    const saved = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
-    setChats(saved);
+  const loadChats = async () => {
+    try {
+      const res = await axios.get('http://localhost:3001/api/chats');
+      setChats(res.data);
+    } catch (err) {
+      console.error('Failed to load chats:', err);
+    }
   };
 
   useEffect(() => {
     loadChats();
+    
+    const handleChatActive = (e: any) => setActiveChat(e.detail);
+    
     window.addEventListener('chats_updated', loadChats);
-    return () => window.removeEventListener('chats_updated', loadChats);
+    window.addEventListener('chats_loaded', (e: any) => setChats(e.detail));
+    window.addEventListener('chat_active', handleChatActive);
+    
+    return () => {
+      window.removeEventListener('chats_updated', loadChats);
+      window.removeEventListener('chats_loaded', (e: any) => setChats(e.detail));
+      window.removeEventListener('chat_active', handleChatActive);
+    };
   }, []);
 
   const handleNewChat = () => {
+    setActiveChat(null);
     window.dispatchEvent(new CustomEvent('new_chat_clicked'));
     router.push('/chat');
   };
 
   const handleLoadChat = (id: string) => {
+    setActiveChat(id);
     window.dispatchEvent(new CustomEvent('load_chat_clicked', { detail: id }));
     router.push('/chat');
+  };
+
+  const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this chat?')) return;
+    
+    try {
+      await axios.delete(`http://localhost:3001/api/chats/${id}`);
+      loadChats();
+    } catch (err) {
+      console.error('Failed to delete chat:', err);
+    }
   };
 
   return (
@@ -102,17 +132,33 @@ export default function Sidebar() {
                     visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.2 } }
                   }}
                 >
-                  {chats.map(chat => (
+                  {chats.map(chat => {
+                    const isActive = activeChat === chat.id;
+                    return (
                       <motion.div 
                           key={chat.id} 
                           variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
                           onClick={() => handleLoadChat(chat.id)}
-                          className="flex items-center space-x-3 px-3 py-2 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800/50 cursor-pointer transition-all group"
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all group ${
+                            isActive 
+                              ? 'bg-white/10 text-white' 
+                              : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
+                          }`}
                       >
-                          <MessageCircle size={14} className="shrink-0" />
-                          <span className="text-sm font-medium truncate group-hover:text-white transition-colors">{chat.title}</span>
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                              <MessageCircle size={14} className="shrink-0" />
+                              <span className={`text-sm font-medium truncate transition-colors ${isActive ? 'text-white' : 'group-hover:text-white'}`}>{chat.title}</span>
+                          </div>
+                          <button
+                              onClick={(e) => handleDeleteChat(chat.id, e)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all shrink-0"
+                              title="Delete chat"
+                          >
+                              <Trash2 size={12} className="text-zinc-600 hover:text-red-400" />
+                          </button>
                       </motion.div>
-                  ))}
+                    );
+                  })}
                 </motion.div>
             )}
         </div>

@@ -8,7 +8,21 @@ import { motion } from 'framer-motion';
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isSolo, setIsSolo] = useState(true);
+  const [isSolo, setIsSolo] = useState(() => {
+    // Load from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('neurongrid_view_mode');
+      return saved === 'team' ? false : true;
+    }
+    return true;
+  });
+
+  // Save to localStorage when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('neurongrid_view_mode', isSolo ? 'solo' : 'team');
+    }
+  }, [isSolo]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -31,7 +45,7 @@ export default function Dashboard() {
     : stats?.nodes || [];
 
   if (loading) return (
-    <div className="min-h-full bg-black flex flex-col items-center justify-center space-y-6">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-6">
       <div className="w-16 h-16 border-4 border-t-white border-zinc-800 rounded-full animate-spin"></div>
       <div className="text-zinc-500 font-bold tracking-[0.3em] uppercase text-xs animate-pulse">
         NeuronGrid Engine Initializing...
@@ -40,8 +54,8 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-full bg-[#050505] text-white selection:bg-white selection:text-black">
-      <div className="max-w-[1600px] mx-auto px-8 py-12 space-y-12">
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black">
+      <div className="max-w-[1600px] mx-auto px-8 py-12 space-y-12 pb-32">
         
         {/* Top Product Bar */}
         <div className="flex justify-between items-center border-b border-zinc-900 pb-8">

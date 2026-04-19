@@ -54,7 +54,7 @@ function installNodeDeps(name, dir) {
 }
 
 if (command === 'start') {
-    console.log("🚀 Starting Full NeuronGrid Cluster...");
+    console.log("🚀 Starting Full NeuronGrid Cluster (Master + Worker Mode)...");
     
     const orchDir = path.join(rootDir, 'cluster-core', 'orchestrator');
     const mmDir = path.join(rootDir, 'cluster-core', 'model-manager');
@@ -86,7 +86,7 @@ if (command === 'start') {
     }, 2000);
 
 } else if (command === 'node') {
-    console.log("🚀 Starting NeuronGrid LAN Worker Node...");
+    console.log("🚀 Starting NeuronGrid Worker Node (Auto-discovers any Master on LAN)...");
     
     const devDir = path.join(rootDir, 'node-agent', 'device-service');
     const runDir = path.join(rootDir, 'node-agent', 'model-runner');
@@ -98,12 +98,56 @@ if (command === 'start') {
 
     runCmd('Device-Service', `${pythonCmd} main.py`, devDir);
     runCmd('Model-Runner', `${pythonCmd} main.py`, runDir);
+} else if (command === 'peer') {
+    console.log("🚀 Starting NeuronGrid in Peer Mode (Master + Worker + Auto-Discovery)...");
+    console.log("   This node will:");
+    console.log("   • Run its own orchestrator (can be master)");
+    console.log("   • Contribute compute as worker");
+    console.log("   • Auto-discover other peers on LAN");
+    console.log("   • Share models and workload");
+    console.log("");
+    
+    const orchDir = path.join(rootDir, 'cluster-core', 'orchestrator');
+    const mmDir = path.join(rootDir, 'cluster-core', 'model-manager');
+    const devDir = path.join(rootDir, 'node-agent', 'device-service');
+    const runDir = path.join(rootDir, 'node-agent', 'model-runner');
+    const frontDir = path.join(rootDir, 'web-ui', 'frontend');
+    const backDir = path.join(rootDir, 'web-ui', 'backend');
+
+    // Install all deps
+    installPythonDeps('Orchestrator', orchDir);
+    installPythonDeps('Model-Manager', mmDir);
+    installPythonDeps('Device-Service', devDir);
+    installPythonDeps('Model-Runner', runDir);
+    installNodeDeps('Web-Frontend', frontDir);
+    installNodeDeps('Web-Backend', backDir);
+
+    const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
+
+    // Start all services
+    runCmd('Orchestrator', `${pythonCmd} main.py`, orchDir);
+    runCmd('Model-Manager', `${pythonCmd} main.py`, mmDir);
+    runCmd('Device-Service', `${pythonCmd} main.py`, devDir);
+    runCmd('Model-Runner', `${pythonCmd} main.py`, runDir);
+    
+    setTimeout(() => {
+        runCmd('Web-Frontend', `npm run dev`, frontDir);
+        runCmd('Web-Backend', `npm start`, backDir);
+    }, 2000);
 } else {
     console.log(`
-🧠 NeuronGrid (NeuronGrid) CLI
+🧠 NeuronGrid CLI
 
 Usage:
-  NeuronGrid start    # Starts Master Node (Orchestrator, UI, Model Manager, and local Agent)
-  NeuronGrid node     # Starts Worker Node Agent (Auto-discovers Orchestrator on LAN via UDP)
+  NeuronGrid start    # Master Node (Orchestrator + UI + Worker)
+  NeuronGrid node     # Worker Node Only (Auto-discovers Master)
+  NeuronGrid peer     # Peer Mode (Can be Master OR Worker, auto-mesh)
+
+Peer Mode:
+  • Every device runs full stack
+  • Auto-discovers other peers on LAN
+  • First peer becomes master, others join as workers
+  • If master goes offline, another peer takes over
+  • Access UI on any peer: http://localhost:3000
 `);
 }

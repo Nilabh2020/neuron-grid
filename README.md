@@ -46,7 +46,24 @@ graph TD
 
 ## 🛠️ Quick Start (MVP Phase 1)
 
-### 1. Start the Orchestrator
+### Peer Mode (Recommended - Run on ALL devices)
+```bash
+# Windows
+Start-Peer.bat
+
+# Linux/Mac
+node cli.js peer
+```
+
+Every device runs the full stack and can be master OR worker!
+- Open UI on any device: http://localhost:3000
+- Auto-discovers other peers on LAN
+- First device you use becomes master
+- See [PEER-MODE.md](PEER-MODE.md) for details
+
+### Traditional Mode (Master/Worker)
+
+#### 1. Start the Master Node
 ```bash
 cd cluster-core/orchestrator
 python -m venv venv
@@ -55,7 +72,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 2. Start a Node Agent
+#### 2. Start a Worker Node
 ```bash
 cd node-agent/device-service
 python -m venv venv

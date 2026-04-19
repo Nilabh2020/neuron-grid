@@ -26,18 +26,23 @@ export default function ChatPlayground() {
 
   useEffect(() => {
     setChatId(Date.now().toString());
+    loadChatsFromBackend();
 
     const handleNewChat = () => {
       setMessages([]);
-      setChatId(Date.now().toString());
+      const newId = Date.now().toString();
+      setChatId(newId);
     };
     
-    const handleLoadChat = (e: any) => {
+    const handleLoadChat = async (e: any) => {
       const id = e.detail;
-      const allChats = JSON.parse(localStorage.getItem('neuron_chats_data') || '{}');
-      if (allChats[id]) {
-        setMessages(allChats[id]);
+      try {
+        const res = await axios.get(`http://localhost:3001/api/chats/${id}`);
+        setMessages(res.data.messages);
         setChatId(id);
+        window.dispatchEvent(new CustomEvent('chat_active', { detail: id }));
+      } catch (err) {
+        console.error('Failed to load chat:', err);
       }
     };
 
@@ -50,26 +55,45 @@ export default function ChatPlayground() {
     };
   }, []);
 
+  const loadChatsFromBackend = async () => {
+    try {
+      const res = await axios.get('http://localhost:3001/api/chats');
+      window.dispatchEvent(new CustomEvent('chats_loaded', { detail: res.data }));
+    } catch (err) {
+      console.error('Failed to load chats:', err);
+    }
+  };
+
   useEffect(() => {
     if (messages.length > 0 && chatId) {
-      const allChats = JSON.parse(localStorage.getItem('neuron_chats_data') || '{}');
-      allChats[chatId] = messages;
-      localStorage.setItem('neuron_chats_data', JSON.stringify(allChats));
-      
-      const chatMeta = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
-      if (!chatMeta.find((c: any) => c.id === chatId)) {
-        const userMsg = messages.find(m => m.role === 'user');
-        const title = userMsg ? userMsg.content.slice(0, 25) + (userMsg.content.length > 25 ? '...' : '') : "New Conversation";
-        chatMeta.unshift({ id: chatId, title });
-        localStorage.setItem('neuron_chats', JSON.stringify(chatMeta));
-        window.dispatchEvent(new Event('chats_updated'));
-        
-        if (userMsg) {
-          generateChatTitle(chatId, userMsg.content);
-        }
-      }
+      saveChatToBackend();
     }
   }, [messages, chatId]);
+
+  const saveChatToBackend = async () => {
+    if (!chatId || messages.length === 0) return;
+    
+    try {
+      const userMsg = messages.find(m => m.role === 'user');
+      const title = userMsg ? userMsg.content.slice(0, 30) + (userMsg.content.length > 30 ? '...' : '') : "New Conversation";
+      
+      await axios.post('http://localhost:3001/api/chats/save', {
+        chatId,
+        messages,
+        title
+      });
+      
+      loadChatsFromBackend();
+      window.dispatchEvent(new CustomEvent('chat_active', { detail: chatId }));
+      
+      // Only generate title for the first user message
+      if (userMsg && messages.length <= 2) {
+        generateChatTitle(chatId, userMsg.content);
+      }
+    } catch (err) {
+      console.error('Failed to save chat:', err);
+    }
+  };
 
   const generateChatTitle = async (id: string, text: string) => {
     try {
@@ -80,13 +104,13 @@ export default function ChatPlayground() {
       });
       const title = res.data.choices[0].message.content.replace(/["']/g, '').trim();
       
-      const chatMeta = JSON.parse(localStorage.getItem('neuron_chats') || '[]');
-      const chatIndex = chatMeta.findIndex((c: any) => c.id === id);
-      if (chatIndex >= 0) {
-        chatMeta[chatIndex].title = title;
-        localStorage.setItem('neuron_chats', JSON.stringify(chatMeta));
-        window.dispatchEvent(new Event('chats_updated'));
-      }
+      await axios.post('http://localhost:3001/api/chats/save', {
+        chatId: id,
+        messages,
+        title
+      });
+      
+      loadChatsFromBackend();
     } catch (err) {
       console.error("Title generation failed", err);
     }
@@ -118,8 +142,7 @@ export default function ChatPlayground() {
     setTelemetry("Initializing neural link...");
 
     try {
-      const systemPrompt = { role: 'system', content: 'You are Neuron, a helpful and highly capable AI running locally on a private enterprise cluster. Be conversational, direct, and concise. Never use generic robotic disclaimers.' };
-      const apiMessages = [systemPrompt, ...newMessages];
+      const apiMessages = [...newMessages];
 
       const response = await fetch('http://localhost:3001/api/chat', {
         method: 'POST',
@@ -197,7 +220,7 @@ export default function ChatPlayground() {
   };
 
   return (
-    <div className="h-[calc(100vh)] flex flex-col max-w-5xl mx-auto relative p-8">
+    <div className="h-screen flex flex-col max-w-5xl mx-auto relative p-8">
       <header className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-6 shrink-0">
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight text-white mb-2 flex items-center space-x-3">
